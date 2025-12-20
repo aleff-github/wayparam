@@ -6,6 +6,16 @@ This project is **inspired by ParamSpider** (same overall goal, completely rewri
 
 > OSINT tool: **wayparam does not crawl targets**. It only queries the Wayback CDX API.
 
+Convert this `example.com` into something like this:
+
+```
+...
+http://www.example.com/_next/image?q=FUZZ&url=FUZZ&w=FUZZ
+https://www.example.com/_Incapsula_Resource?SWJIYLWA=FUZZ
+http://www.example.com/?format=FUZZ&retailerId=FUZZ
+...
+```
+
 ---
 
 ## Key features
