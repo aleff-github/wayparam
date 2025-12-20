@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "wayparam"
-version = "0.2.3"
+version = "0.3.0"
 description = "Fetch and normalize parameterized URLs from the Internet Archive Wayback CDX API (OSINT-friendly)."
 readme = "README.md"
 requires-python = ">=3.9"

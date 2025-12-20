@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.3.0
+- Milestone
+
 ## 0.2.3
 - Added httpx-level integration tests using MockTransport (no network)
 
