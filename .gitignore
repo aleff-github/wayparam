@@ -1,0 +1,12 @@
+# ---------- Outputs / runtime artifacts ----------
+results/
+
+# ---------- Python bytecode / caches ----------
+__pycache__/
+.pytest_cache/
+
+# ---------- Virtual environments ----------
+.venv/
+
+# ---------- Secrets ----------
+.env

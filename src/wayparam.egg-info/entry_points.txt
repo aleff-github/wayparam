@@ -1,0 +1,2 @@
+[console_scripts]
+wayparam = wayparam.cli:main

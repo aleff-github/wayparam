@@ -1,0 +1,90 @@
+Metadata-Version: 2.4
+Name: wayparam
+Version: 0.2.2
+Summary: Fetch and normalize parameterized URLs from the Internet Archive Wayback CDX API (OSINT-friendly).
+Author: Aleff
+License: GPLv3
+Project-URL: Homepage, https://example.com
+Project-URL: Repository, https://example.com
+Project-URL: Issues, https://example.com
+Keywords: osint,wayback,url,parameters,security
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: License :: OSI Approved :: GPLv3 License
+Classifier: Operating System :: OS Independent
+Classifier: Environment :: Console
+Classifier: Topic :: Security
+Classifier: Topic :: Internet :: WWW/HTTP
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: httpx>=0.26.0
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0.0; extra == "dev"
+Requires-Dist: ruff>=0.6.0; extra == "dev"
+Dynamic: license-file
+
+# wayparam
+
+A modern, cross-platform rewrite inspired by ParamSpider.
+
+## What it does
+- Queries the Internet Archive **Wayback CDX API** for URLs for one domain or many domains
+- Filters out “boring” URLs (static assets by default)
+- Canonicalizes and **masks query parameter values** (default placeholder: `FUZZ`)
+- Outputs **only URLs with query parameters** by default
+
+> This is an OSINT tool: it does not crawl websites and does not send requests to your targets.
+
+## Install (editable)
+```bash
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+# macOS/Linux: source .venv/bin/activate
+pip install -U pip
+pip install -e .
+```
+
+## Usage
+Single domain:
+```bash
+wayparam -d example.com
+```
+
+List of domains:
+```bash
+wayparam -l domains.txt
+```
+
+Stream to stdout (for piping):
+```bash
+wayparam -d example.com --stdout --no-files
+```
+
+More controls:
+```bash
+wayparam -l domains.txt -o results --include-subdomains --placeholder X \
+  --drop-tracking --ext-blacklist ".png,.jpg,.gif,.css,.js" \
+  --concurrency 8 --rps 2
+```
+
+## Output
+By default writes: `results/<domain>.txt`
+
+
+## Output formats
+- `--format txt` (default): one URL per line
+- `--format jsonl`: JSON Lines records: {domain,url,source,fetched_at}
+
+## Diagnostics
+- stdout is kept machine-readable; hints/stats are printed to stderr.
+- Use `-v` / `-vv` for more logs, `--quiet` for errors only.
+
+
+## Man page
+A manual page is included at `man/wayparam.1`.
+
+To preview locally on Linux/macOS:
+```bash
+man ./man/wayparam.1
+```

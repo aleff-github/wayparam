@@ -1,0 +1,211 @@
+.TH WAYPARAM 1 "December 2025" "wayparam 0.2.3" "User Commands"
+.SH NAME
+wayparam \- fetch and normalize parameterized URLs from the Wayback CDX API
+.SH SYNOPSIS
+.B wayparam
+.RI [ options ] " -d DOMAIN"
+.br
+.B wayparam
+.RI [ options ] " -l FILE"
+.SH DESCRIPTION
+.B wayparam
+queries the Internet Archive Wayback Machine CDX API to retrieve historical URLs for a host
+(or a list of hosts), filters out common static/boring URLs, and outputs normalized URLs
+that contain query parameters.
+
+By default, query parameter values are replaced with a placeholder (default:
+.BR FUZZ ),
+making the output suitable for sharing and fuzzing workflows.
+
+The tool is intended for OSINT-style URL collection. It does not crawl targets and only queries
+the Wayback CDX API.
+.SH OUTPUT BEHAVIOR
+Diagnostics (logs, hints, stats) are written to
+.BR stderr .
+Machine-readable results (URLs or JSONL) are written to
+.BR stdout
+only when
+.BR --stdout
+is set.
+
+Per-domain files are written to
+.BR results/
+by default, unless
+.BR --no-files
+is specified.
+.SH OPTIONS
+.SS Input
+.TP
+.BR \-d ", " \-\-domain " " \fIDOMAIN\fR
+Query a single domain/host (e.g.
+.IR example.com ).
+.TP
+.BR \-l ", " \-\-list " " \fIFILE\fR
+Read domains/hosts from a file (one per line). Use
+.B \-
+to read from stdin.
+.SS Output
+.TP
+.BR \-o ", " \-\-outdir " " \fIDIR\fR
+Output directory for per-domain result files (default:
+.IR results ).
+.TP
+.BR \-\-stdout
+Stream results to stdout (machine-readable). Diagnostics remain on stderr.
+.TP
+.BR \-\-format " " {txt|jsonl}
+Output format for stdout and per-domain files (default:
+.IR txt ).
+.RS
+.TP
+.B txt
+One URL per line.
+.TP
+.B jsonl
+JSON Lines records with keys:
+.BR domain ,
+.BR url ,
+.BR source ,
+.BR fetched_at .
+.RE
+.TP
+.BR \-\-no\-files
+Do not write per-domain output files. Requires
+.BR --stdout .
+.TP
+.BR \-\-stats
+Print per-domain counts (fetched/kept) to stderr at the end.
+.SS Wayback / CDX
+.TP
+.BR \-\-include\-subdomains
+Include subdomains by using CDX matchType=domain (default: host only).
+.TP
+.BR \-\-from " " \fITIMESTAMP\fR
+Only include captures from this timestamp/year (e.g.
+.IR 2019
+or
+.IR 20190101000000 ).
+.TP
+.BR \-\-to " " \fITIMESTAMP\fR
+Only include captures up to this timestamp/year.
+.TP
+.BR \-\-no\-collapse
+Disable CDX collapse=urlkey (may return more duplicates).
+.TP
+.BR \-\-filter " " \fIFILTER\fR
+Add a CDX filter string (repeatable). Example:
+.IR statuscode:200 .
+.TP
+.BR \-\-limit " " \fIN\fR
+CDX page size / limit per request (default: 50000).
+.SS Normalization and Filtering
+.TP
+.BR \-\-placeholder " " \fISTR\fR
+Placeholder used for query parameter values (default:
+.IR FUZZ ).
+.TP
+.BR \-\-keep\-values
+Keep original query parameter values (not recommended for sharing logs).
+.TP
+.BR \-\-all\-urls
+Include URLs without query parameters (default: only URLs with parameters).
+.TP
+.BR \-\-drop\-tracking " / " \-\-no\-drop\-tracking
+Drop or keep common tracking parameters (default: drop).
+.TP
+.BR \-\-ext\-blacklist " " \fICSV\fR
+Comma-separated list of extensions to exclude (overrides defaults), e.g.
+.IR ".png,.jpg,.css" .
+.TP
+.BR \-\-ext\-whitelist " " \fICSV\fR
+Comma-separated list of extensions to allow; anything else is excluded.
+.TP
+.BR \-\-exclude\-path\-regex " " \fIREGEX\fR
+Regex to exclude URLs by path (repeatable).
+.SS Performance and Network
+.TP
+.BR \-\-concurrency " " \fIN\fR
+Number of domains processed concurrently (default: 6).
+.TP
+.BR \-\-rps " " \fIFLOAT\fR
+Global requests per second to the Wayback CDX API (default: 0 = unlimited).
+.TP
+.BR \-\-timeout " " \fISECONDS\fR
+HTTP timeout in seconds (default: 30).
+.TP
+.BR \-\-retries " " \fIN\fR
+HTTP retry attempts (default: 4).
+.TP
+.BR \-\-proxy " " \fIURL\fR
+HTTP proxy URL (e.g.
+.IR http://127.0.0.1:8080 ).
+.TP
+.BR \-\-user\-agent " " \fISTR\fR
+Override the User-Agent header.
+.TP
+.BR \-\-quiet
+Only show errors (stderr).
+.TP
+.BR \-v ", " \-vv
+Increase verbosity (stderr).
+.SH EXAMPLES
+Fetch URLs for a single domain and write results to
+.IR results/example.com.txt :
+.PP
+.RS
+.nf
+wayparam -d example.com
+.fi
+.RE
+.PP
+Stream URLs to stdout (for piping) and do not write files:
+.PP
+.RS
+.nf
+wayparam -d example.com --stdout --no-files
+.fi
+.RE
+.PP
+Write JSONL output and print stats to stderr:
+.PP
+.RS
+.nf
+wayparam -l domains.txt --format jsonl --stats
+.fi
+.RE
+.PP
+Be polite to the Wayback API:
+.PP
+.RS
+.nf
+wayparam -d example.com --rps 1 --concurrency 2
+.fi
+.RE
+.SH FILES
+.TP
+.I results/<domain>.txt
+Default per-domain output file (txt format).
+.TP
+.I results/<domain>.jsonl
+Per-domain output file when using
+.BR --format jsonl .
+.SH EXIT STATUS
+.TP
+.B 0
+Success (all domains processed).
+.TP
+.B 2
+Partial failure (one or more domains failed).
+.TP
+.B 130
+Interrupted by user (Ctrl+C).
+.SH NOTES
+If requests to the CDX endpoint consistently fail after retries, a VPN/proxy exit node may be blocked or
+rate-limited by
+.IR web.archive.org .
+Try disconnecting the VPN/proxy or switching to a different exit node.
+.SH SEE ALSO
+.BR curl (1),
+.BR jq (1)
+.SH LICENSE
+GPLv3 License.
