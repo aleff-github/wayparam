@@ -9,7 +9,7 @@ description = "Fetch and normalize parameterized URLs from the Internet Archive 
 readme = "README.md"
 requires-python = ">=3.9"
 license = {text = "GPL-3.0"}
-authors = [{name = "Your Name"}]
+authors = [{name = "Aleff"}]
 keywords = ["osint", "wayback", "url", "parameters", "security"]
 classifiers = [
   "Programming Language :: Python :: 3",
@@ -35,9 +35,9 @@ dev = [
 wayparam = "wayparam.cli:main"
 
 [project.urls]
-Homepage = "https://example.com"
-Repository = "https://example.com"
-Issues = "https://example.com"
+Homepage = "https://aleff-github.github.io/wayparam/"
+Repository = "https://github.com/aleff-github/wayparam"
+Issues = "https://github.com/aleff-github/wayparam/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
