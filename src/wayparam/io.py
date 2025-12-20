@@ -6,13 +6,13 @@ from pathlib import Path
 
 
 def read_domains(path: str) -> list[str]:
-    '''
+    """
     Read domains from a file (or '-' for stdin). Normalizes:
     - strips scheme
     - strips paths
     - lowercases
     - drops blank/comment lines
-    '''
+    """
     import sys
     from urllib.parse import urlsplit
 

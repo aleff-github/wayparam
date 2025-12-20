@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import re
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import AsyncIterator
 
 import httpx
 
 from .http import HttpConfig, get_text
 from .ratelimit import RateLimiter
-
 
 CDX_ENDPOINT = "https://web.archive.org/cdx/search/cdx"
 

@@ -2,7 +2,9 @@ from wayparam.normalize import NormalizeOptions, canonicalize_url
 
 
 def test_canonicalize_masks_values_and_sorts_and_drops_default_port():
-    opt = NormalizeOptions(placeholder="FUZZ", keep_values=False, only_params=True, drop_tracking=False)
+    opt = NormalizeOptions(
+        placeholder="FUZZ", keep_values=False, only_params=True, drop_tracking=False
+    )
     u = "https://EXAMPLE.com:443/path?b=2&a=1"
     out = canonicalize_url(u, opt)
     assert out == "https://example.com/path?a=FUZZ&b=FUZZ"

@@ -3,14 +3,22 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Tuple
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
-
 
 TRACKING_PREFIXES = ("utm_",)
 TRACKING_KEYS = {
-    "gclid", "fbclid", "msclkid", "igshid", "mc_cid", "mc_eid", "ref", "ref_src",
-    "yclid", "gbraid", "wbraid", "twclid",
+    "gclid",
+    "fbclid",
+    "msclkid",
+    "igshid",
+    "mc_cid",
+    "mc_eid",
+    "ref",
+    "ref_src",
+    "yclid",
+    "gbraid",
+    "wbraid",
+    "twclid",
 }
 
 
@@ -35,7 +43,7 @@ _DEFAULT_PORTS = {("http", 80), ("https", 443)}
 
 
 def canonicalize_url(url: str, opt: NormalizeOptions) -> str | None:
-    '''
+    """
     Returns a canonicalized URL or None if filtered out by only_params / drop_empty.
 
     - removes fragments
@@ -43,7 +51,7 @@ def canonicalize_url(url: str, opt: NormalizeOptions) -> str | None:
     - sorts params
     - optionally drops tracking params
     - optionally masks values
-    '''
+    """
     try:
         parts = urlsplit(url.strip())
     except Exception:
@@ -72,7 +80,7 @@ def canonicalize_url(url: str, opt: NormalizeOptions) -> str | None:
     path = parts.path or "/"
 
     qsl = parse_qsl(parts.query, keep_blank_values=True)
-    out: list[Tuple[str, str]] = []
+    out: list[tuple[str, str]] = []
     for k, v in qsl:
         if opt.drop_tracking and _is_tracking_key(k):
             continue

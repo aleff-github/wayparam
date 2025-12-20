@@ -1,12 +1,11 @@
 import asyncio
-import json
 
 import httpx
 
+from wayparam.filters import DEFAULT_EXT_BLACKLIST, FilterOptions, is_boring
 from wayparam.http import HttpConfig, get_text
-from wayparam.wayback import CdxOptions, iter_original_urls
 from wayparam.normalize import NormalizeOptions, canonicalize_url
-from wayparam.filters import FilterOptions, DEFAULT_EXT_BLACKLIST, is_boring
+from wayparam.wayback import CdxOptions, iter_original_urls
 
 
 def test_get_text_retries_on_429_then_succeeds():
@@ -23,7 +22,12 @@ def test_get_text_retries_on_429_then_succeeds():
     async def run():
         async with httpx.AsyncClient(transport=transport) as client:
             cfg = HttpConfig(timeout_s=5, retries=2, backoff_base_s=0.0, max_backoff_s=0.0)
-            txt = await get_text(client, "https://web.archive.org/cdx/search/cdx", params=[("url", "example.com")], config=cfg)
+            txt = await get_text(
+                client,
+                "https://web.archive.org/cdx/search/cdx",
+                params=[("url", "example.com")],
+                config=cfg,
+            )
             return txt
 
     txt = asyncio.run(run())
@@ -41,7 +45,12 @@ def test_get_text_raises_after_retries_includes_status():
         async with httpx.AsyncClient(transport=transport) as client:
             cfg = HttpConfig(timeout_s=5, retries=1, backoff_base_s=0.0, max_backoff_s=0.0)
             try:
-                await get_text(client, "https://web.archive.org/cdx/search/cdx", params=[("url", "example.com")], config=cfg)
+                await get_text(
+                    client,
+                    "https://web.archive.org/cdx/search/cdx",
+                    params=[("url", "example.com")],
+                    config=cfg,
+                )
             except RuntimeError as e:
                 return str(e)
         return ""
@@ -69,7 +78,9 @@ def test_iter_original_urls_paginates_with_resume_key():
             cfg = HttpConfig(timeout_s=5, retries=0, backoff_base_s=0.0, max_backoff_s=0.0)
             opt = CdxOptions(include_subdomains=False, collapse=None, limit=10)
             out = []
-            async for u in iter_original_urls("example.com", client=client, http_config=cfg, rate_limiter=None, opt=opt):
+            async for u in iter_original_urls(
+                "example.com", client=client, http_config=cfg, rate_limiter=None, opt=opt
+            ):
                 out.append(u)
             return out
 
@@ -98,10 +109,14 @@ def test_pipeline_filters_boring_and_normalizes_params():
             cfg = HttpConfig(timeout_s=5, retries=0, backoff_base_s=0.0, max_backoff_s=0.0)
             opt = CdxOptions(collapse=None, limit=10)
             filt = FilterOptions(ext_blacklist=set(DEFAULT_EXT_BLACKLIST))
-            norm = NormalizeOptions(placeholder="FUZZ", keep_values=False, only_params=True, drop_tracking=False)
+            norm = NormalizeOptions(
+                placeholder="FUZZ", keep_values=False, only_params=True, drop_tracking=False
+            )
 
             kept = []
-            async for raw in iter_original_urls("example.com", client=client, http_config=cfg, rate_limiter=None, opt=opt):
+            async for raw in iter_original_urls(
+                "example.com", client=client, http_config=cfg, rate_limiter=None, opt=opt
+            ):
                 if is_boring(raw, filt):
                     continue
                 canon = canonicalize_url(raw, norm)

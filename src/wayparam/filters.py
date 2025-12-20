@@ -7,13 +7,52 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 from urllib.parse import urlsplit
 
-
 DEFAULT_EXT_BLACKLIST = {
-    ".7z", ".avi", ".bmp", ".css", ".csv", ".doc", ".docx", ".eot", ".eps", ".exe",
-    ".gif", ".gz", ".ico", ".iso", ".jpeg", ".jpg", ".js", ".json", ".map", ".mkv",
-    ".mov", ".mp3", ".mp4", ".mpeg", ".mpg", ".otf", ".pdf", ".png", ".ppt", ".pptx",
-    ".rar", ".rss", ".svg", ".tar", ".tif", ".tiff", ".ttf", ".txt", ".wav", ".webm",
-    ".webp", ".woff", ".woff2", ".xml", ".zip",
+    ".7z",
+    ".avi",
+    ".bmp",
+    ".css",
+    ".csv",
+    ".doc",
+    ".docx",
+    ".eot",
+    ".eps",
+    ".exe",
+    ".gif",
+    ".gz",
+    ".ico",
+    ".iso",
+    ".jpeg",
+    ".jpg",
+    ".js",
+    ".json",
+    ".map",
+    ".mkv",
+    ".mov",
+    ".mp3",
+    ".mp4",
+    ".mpeg",
+    ".mpg",
+    ".otf",
+    ".pdf",
+    ".png",
+    ".ppt",
+    ".pptx",
+    ".rar",
+    ".rss",
+    ".svg",
+    ".tar",
+    ".tif",
+    ".tiff",
+    ".ttf",
+    ".txt",
+    ".wav",
+    ".webm",
+    ".webp",
+    ".woff",
+    ".woff2",
+    ".xml",
+    ".zip",
 }
 
 
@@ -52,9 +91,9 @@ def is_boring(url: str, opt: FilterOptions) -> bool:
 
 
 def parse_ext_set(csv: str) -> set[str]:
-    '''
+    """
     Parse comma-separated extensions like ".png,.jpg,css" -> {".png",".jpg",".css"}
-    '''
+    """
     out: set[str] = set()
     for raw in csv.split(","):
         raw = raw.strip()

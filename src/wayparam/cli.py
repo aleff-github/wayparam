@@ -50,37 +50,88 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default="txt",
         help="Output format: txt or jsonl (default: txt)",
     )
-    p.add_argument("--no-files", action="store_true", help="Do not write per-domain files (use with --stdout).")
-    p.add_argument("--stats", action="store_true", help="Print per-domain stats to stderr at the end.")
+    p.add_argument(
+        "--no-files", action="store_true", help="Do not write per-domain files (use with --stdout)."
+    )
+    p.add_argument(
+        "--stats", action="store_true", help="Print per-domain stats to stderr at the end."
+    )
     p.add_argument("--quiet", action="store_true", help="Only show errors (stderr).")
 
     # Wayback/CDX options
-    p.add_argument("--include-subdomains", action="store_true", help="Include subdomains (matchType=domain).")
-    p.add_argument("--from", dest="from_ts", default=None, help="Filter captures from timestamp/year.")
+    p.add_argument(
+        "--include-subdomains", action="store_true", help="Include subdomains (matchType=domain)."
+    )
+    p.add_argument(
+        "--from", dest="from_ts", default=None, help="Filter captures from timestamp/year."
+    )
     p.add_argument("--to", dest="to_ts", default=None, help="Filter captures to timestamp/year.")
-    p.add_argument("--no-collapse", action="store_true", help="Disable collapse=urlkey (more duplicates).")
-    p.add_argument("--filter", action="append", default=None, help="CDX filter string (repeatable). Example: statuscode:200")
+    p.add_argument(
+        "--no-collapse", action="store_true", help="Disable collapse=urlkey (more duplicates)."
+    )
+    p.add_argument(
+        "--filter",
+        action="append",
+        default=None,
+        help="CDX filter string (repeatable). Example: statuscode:200",
+    )
     p.add_argument("--limit", type=int, default=50000, help="CDX page size (default: 50000).")
 
     # Normalization/filtering options
-    p.add_argument("--placeholder", default="FUZZ", help="Placeholder for parameter values (default: FUZZ).")
+    p.add_argument(
+        "--placeholder", default="FUZZ", help="Placeholder for parameter values (default: FUZZ)."
+    )
     p.add_argument("--keep-values", action="store_true", help="Keep original parameter values.")
-    p.add_argument("--all-urls", action="store_true", help="Keep URLs even without query parameters.")
-    p.add_argument("--drop-tracking", action="store_true", default=True, help="Drop common tracking params (default: on).")
-    p.add_argument("--no-drop-tracking", action="store_false", dest="drop_tracking", help="Do not drop tracking params.")
+    p.add_argument(
+        "--all-urls", action="store_true", help="Keep URLs even without query parameters."
+    )
+    p.add_argument(
+        "--drop-tracking",
+        action="store_true",
+        default=True,
+        help="Drop common tracking params (default: on).",
+    )
+    p.add_argument(
+        "--no-drop-tracking",
+        action="store_false",
+        dest="drop_tracking",
+        help="Do not drop tracking params.",
+    )
 
-    p.add_argument("--ext-blacklist", default=None, help="Comma-separated extensions to exclude (overrides defaults).")
-    p.add_argument("--ext-whitelist", default=None, help="Comma-separated extensions to allow; anything else is excluded.")
-    p.add_argument("--exclude-path-regex", action="append", default=None, help="Regex to exclude by PATH (repeatable).")
+    p.add_argument(
+        "--ext-blacklist",
+        default=None,
+        help="Comma-separated extensions to exclude (overrides defaults).",
+    )
+    p.add_argument(
+        "--ext-whitelist",
+        default=None,
+        help="Comma-separated extensions to allow; anything else is excluded.",
+    )
+    p.add_argument(
+        "--exclude-path-regex",
+        action="append",
+        default=None,
+        help="Regex to exclude by PATH (repeatable).",
+    )
 
     # Performance/network
     p.add_argument("--concurrency", type=int, default=6, help="Concurrent domains (default: 6).")
-    p.add_argument("--rps", type=float, default=0.0, help="Global requests-per-second to Wayback (0 = unlimited).")
-    p.add_argument("--timeout", type=float, default=30.0, help="HTTP timeout seconds (default: 30).")
+    p.add_argument(
+        "--rps",
+        type=float,
+        default=0.0,
+        help="Global requests-per-second to Wayback (0 = unlimited).",
+    )
+    p.add_argument(
+        "--timeout", type=float, default=30.0, help="HTTP timeout seconds (default: 30)."
+    )
     p.add_argument("--retries", type=int, default=4, help="HTTP retries (default: 4).")
     p.add_argument("--proxy", default=None, help="HTTP proxy URL (e.g. http://127.0.0.1:8080).")
     p.add_argument("--user-agent", default=None, help="Override User-Agent.")
-    p.add_argument("-v", "--verbose", action="count", default=0, help="Increase log verbosity (-v or -vv).")
+    p.add_argument(
+        "-v", "--verbose", action="count", default=0, help="Increase log verbosity (-v or -vv)."
+    )
     return p
 
 
@@ -210,7 +261,9 @@ async def run_async(args: argparse.Namespace) -> int:
     import re as _re
 
     path_rx = [_re.compile(x) for x in (args.exclude_path_regex or [])] or None
-    filt_opt = FilterOptions(ext_blacklist=ext_blacklist, ext_whitelist=ext_whitelist, path_exclude_regex=path_rx)
+    filt_opt = FilterOptions(
+        ext_blacklist=ext_blacklist, ext_whitelist=ext_whitelist, path_exclude_regex=path_rx
+    )
 
     # Normalization
     norm_opt = NormalizeOptions(

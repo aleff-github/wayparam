@@ -5,10 +5,8 @@ from __future__ import annotations
 import asyncio
 import random
 from dataclasses import dataclass
-from typing import Optional
 
 import httpx
-
 
 DEFAULT_UAS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123 Safari/537.36",
@@ -23,8 +21,8 @@ class HttpConfig:
     retries: int = 4
     backoff_base_s: float = 0.7
     max_backoff_s: float = 12.0
-    user_agent: Optional[str] = None
-    proxy: Optional[str] = None
+    user_agent: str | None = None
+    proxy: str | None = None
 
 
 def _pick_ua(config: HttpConfig) -> str:
@@ -52,7 +50,9 @@ async def get_text(
                 if retry_after and retry_after.isdigit():
                     await asyncio.sleep(min(int(retry_after), config.max_backoff_s))
                 else:
-                    await asyncio.sleep(min(config.backoff_base_s * (2 ** attempt), config.max_backoff_s))
+                    await asyncio.sleep(
+                        min(config.backoff_base_s * (2**attempt), config.max_backoff_s)
+                    )
                 continue
 
             last_status = resp.status_code
@@ -63,7 +63,7 @@ async def get_text(
             last_exc = e
             if attempt >= config.retries:
                 break
-            await asyncio.sleep(min(config.backoff_base_s * (2 ** attempt), config.max_backoff_s))
+            await asyncio.sleep(min(config.backoff_base_s * (2**attempt), config.max_backoff_s))
 
     detail = f"status={last_status}" if last_status else "no-status"
     raise RuntimeError(f"HTTP request failed after retries ({detail}): {url}") from last_exc

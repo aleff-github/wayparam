@@ -7,10 +7,11 @@ import time
 
 
 class RateLimiter:
-    '''
+    """
     Simple global rate limiter (requests per second) that works cross-platform.
     If rps <= 0, it is disabled.
-    '''
+    """
+
     def __init__(self, rps: float):
         self.rps = float(rps)
         self._lock = asyncio.Lock()
