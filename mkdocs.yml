@@ -1,0 +1,24 @@
+site_name: wayparam Documentation
+site_description: Professional documentation for wayparam (Wayback CDX URL parameter collector)
+site_author: wayparam contributors
+repo_name: wayparam
+theme:
+  name: readthedocs
+nav:
+  - Home: index.md
+  - Quickstart: quickstart.md
+  - CLI:
+      - Overview: cli/overview.md
+      - Options (complete): cli/options.md
+      - Practical examples: cli/examples.md
+      - Output & pipelines: cli/output.md
+  - How it works:
+      - Architecture: architecture.md
+      - Internals: internals.md
+      - Internal API reference: api.md
+  - Testing: testing.md
+  - Troubleshooting: troubleshooting.md
+  - Security & ethics: security-ethics.md
+  - Contributing: contributing.md
+  - Packaging readiness: packaging-readiness.md
+  - License: license.md
