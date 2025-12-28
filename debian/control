@@ -1,0 +1,27 @@
+Source: wayparam
+Section: utils
+Priority: optional
+Maintainer: aleff <alessandro.greco.1@protonmail.com>
+Build-Depends:
+ debhelper-compat (= 13),
+ dh-sequence-python3,
+ pybuild-plugin-pyproject,
+ python3-all,
+ python3-httpx,
+ python3-setuptools,
+ python3-wheel,
+ python3-pytest <!nocheck>
+Standards-Version: 4.7.0
+Homepage: https://github.com/aleff-github/wayparam
+Vcs-Git: https://salsa.debian.org/aleff/wayparam.git
+Vcs-Browser: https://salsa.debian.org/aleff/wayparam
+Rules-Requires-Root: no
+
+Package: wayparam
+Architecture: all
+Depends: ${python3:Depends}, ${misc:Depends}
+Description: Wayback CDX URL discovery and parameter normalization tool
+ wayparam is a command-line tool that queries the Internet Archive Wayback
+ Machine CDX API for historical URLs, filters out static assets, and outputs
+ normalized parameterized URLs suitable for OSINT and security workflows.
+ This package provides the `wayparam` CLI.
