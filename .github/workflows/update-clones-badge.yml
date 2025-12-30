@@ -1,0 +1,35 @@
+name: Update clone stats
+
+on:
+  schedule:
+    - cron: "0 */12 * * *" 
+  workflow_dispatch:   
+
+jobs:
+  update-clones:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Get clone stats
+        run: |
+          OWNER=${GITHUB_REPOSITORY%/*}
+          REPO=${GITHUB_REPOSITORY#*/}
+          curl -s \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.CLONE_STATS_TOKEN }}" \
+            https://api.github.com/repos/$OWNER/$REPO/traffic/clones \
+            > clones.json
+
+      - name: Commit changes
+        run: |
+          if git diff --quiet; then
+            echo "No changes."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add clones.json
+          git commit -m "Update clone stats"
+          git push
