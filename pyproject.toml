@@ -9,7 +9,7 @@ description = "Fetch and normalize parameterized URLs from the Internet Archive 
 readme = "README.md"
 requires-python = ">=3.9"
 license = {text = "GPL-3.0"}
-authors = [{name = "Aleff"}]
+authors = [{name = "Alessandro Greco"}]
 keywords = ["osint", "wayback", "url", "parameters", "security"]
 classifiers = [
   "Programming Language :: Python :: 3",
