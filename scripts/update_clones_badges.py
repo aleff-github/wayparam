@@ -63,13 +63,7 @@ def main():
             history[ts] = {"count": int(p.get("count", 0)), "uniques": int(p.get("uniques", 0))}
 
     total_tracked = sum(v.get("count", 0) for v in history.values())
-
-    # Badge JSON (Shields endpoint schema)
-    badge_14d = {
-        "schemaVersion": 1,
-        "label": "clones (14d)",
-        "message": f"{count_14d} ({uniques_14d} uniques)",
-    }
+    
     badge_total = {
         "schemaVersion": 1,
         "label": "clones (tracked)",
@@ -77,7 +71,6 @@ def main():
     }
 
     write_json(history_path, dict(sorted(history.items())))
-    write_json(out_dir / "clones-14d.json", badge_14d)
     write_json(out_dir / "clones-total.json", badge_total)
 
     # Log utile
