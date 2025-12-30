@@ -47,7 +47,13 @@ http://www.example.com/?format=FUZZ&retailerId=FUZZ
 
 ## Installation
 
-### From source (recommended for now)
+### From PyPI (recommended)
+
+```bash
+pip install wayparam
+```
+
+### From source
 
 ```bash
 python -m venv .venv
