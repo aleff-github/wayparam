@@ -1,5 +1,9 @@
 # wayparam
 
+![Clones (tracked)](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/aleff-github/wayparam/main/.github/traffic/clones-total.json&color=A81D33)
+
+
+
 **wayparam** is a modern, cross-platform CLI tool to **fetch historical URLs from the Internet Archive Wayback CDX API**, filter out “boring” URLs (static assets), and **normalize query parameters** so you can focus on endpoints that actually matter.
 
 This project is **inspired by ParamSpider** (same overall goal, completely rewritten with a more robust architecture, modern async I/O, better filtering, and production-friendly output behavior).
