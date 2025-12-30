@@ -1,6 +1,14 @@
 # Quickstart
 
-## Install (from source)
+## Install
+
+### From PyPI (recommended)
+
+```bash
+pip install wayparam
+```
+
+### Install (from source)
 
 From the repository root (where `pyproject.toml` lives):
 
