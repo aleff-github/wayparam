@@ -2,8 +2,8 @@ name: Update clone stats
 
 on:
   schedule:
-    - cron: "0 */12 * * *" 
-  workflow_dispatch:   
+    - cron: "0 */12 * * *"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -16,18 +16,33 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Get clone stats
+        env:
+          GH_TOKEN: ${{ secrets.CLONE_STATS_TOKEN }}
         run: |
           OWNER=${GITHUB_REPOSITORY%/*}
           REPO=${GITHUB_REPOSITORY#*/}
-          curl -s \
+
+          RESPONSE=$(curl -s \
             -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ secrets.CLONE_STATS_TOKEN }}" \
-            https://api.github.com/repos/$OWNER/$REPO/traffic/clones \
-            > clones.json
+            -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/$OWNER/$REPO/traffic/clones")
+
+          export RESPONSE
+
+          COUNT=$(python - << 'PY'
+import json, os
+data = json.loads(os.environ["RESPONSE"])
+print(data.get("count", 0))
+PY
+)
+
+          cat > clones.json <<EOF
+{"schemaVersion": 1, "label": "clones", "message": "$COUNT"}
+EOF
 
       - name: Commit changes
         run: |
-          if git diff --quiet; then
+          if [ -z "$(git status --porcelain)" ]; then
             echo "No changes."
             exit 0
           fi
