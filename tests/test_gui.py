@@ -8,9 +8,8 @@ bound to an ephemeral loopback port, and no run is ever started.
 
 from __future__ import annotations
 
+import http.client
 import json
-import urllib.error
-import urllib.request
 from pathlib import Path
 
 import pytest
@@ -65,43 +64,58 @@ def test_numeric_fields_are_clamped_and_survive_garbage():
 
 @pytest.fixture
 def server():
-    httpd, token = serve("127.0.0.1", 0)
-    port = httpd.server_address[1]
-    yield f"http://127.0.0.1:{port}", token
-    httpd.shutdown()
+    """A server on an ephemeral loopback port.
 
-
-def _status(url: str, *, headers: dict | None = None, data: bytes | None = None) -> int:
-    req = urllib.request.Request(url, data=data, headers=headers or {})
+    Package build environments (sbuild, pbuilder) may forbid sockets, so this
+    skips rather than fails when the port cannot be opened.
+    """
     try:
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            return resp.status
-    except urllib.error.HTTPError as e:
-        return e.code
+        httpd, token = serve("127.0.0.1", 0)
+    except OSError as exc:  # pragma: no cover - environment dependent
+        pytest.skip(f"cannot bind a loopback socket here: {exc}")
+    try:
+        yield httpd.server_address[1], token
+    finally:
+        httpd.shutdown()
+
+
+def _status(port: int, path: str, *, headers: dict | None = None, data: bytes | None = None) -> int:
+    """Raw HTTP against loopback.
+
+    Deliberately not urllib: it honours http_proxy from the environment, and a
+    build environment that sets one would send these requests to a proxy that
+    is not there.
+    """
+    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+    try:
+        conn.request("POST" if data else "GET", path, body=data, headers=headers or {})
+        return conn.getresponse().status
+    finally:
+        conn.close()
 
 
 def test_index_requires_the_token(server):
-    base, token = server
-    assert _status(f"{base}/") == 403
-    assert _status(f"{base}/?t=wrong") == 403
-    assert _status(f"{base}/?t={token}") == 200
+    port, token = server
+    assert _status(port, "/") == 403
+    assert _status(port, "/?t=wrong") == 403
+    assert _status(port, f"/?t={token}") == 200
 
 
 def test_api_requires_the_token(server):
-    base, _ = server
+    port, _ = server
     body = json.dumps({"domains": "example.com"}).encode()
-    assert _status(f"{base}/api/run", data=body) == 403
+    assert _status(port, "/api/run", data=body) == 403
 
 
 def test_foreign_host_header_is_refused(server):
     """Defends against DNS rebinding: a name that resolves to 127.0.0.1."""
-    base, token = server
-    assert _status(f"{base}/?t={token}", headers={"Host": "evil.example"}) == 421
+    port, token = server
+    assert _status(port, f"/?t={token}", headers={"Host": "evil.example"}) == 421
 
 
 def test_unknown_paths_are_not_found(server):
-    base, token = server
-    assert _status(f"{base}/admin?t={token}") == 404
+    port, token = server
+    assert _status(port, f"/admin?t={token}") == 404
 
 
 def test_each_process_gets_a_distinct_token():

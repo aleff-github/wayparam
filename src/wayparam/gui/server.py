@@ -139,7 +139,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
     # ---- responses ----------------------------------------------------
 
     def _send(self, status: int, body: bytes, content_type: str) -> None:
+        if status >= 400:
+            # A rejected POST leaves its body unread on the socket; reusing the
+            # connection would then parse those bytes as the next request.
+            self.close_connection = True
         self.send_response(status)
+        if status >= 400:
+            self.send_header("Connection", "close")
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
