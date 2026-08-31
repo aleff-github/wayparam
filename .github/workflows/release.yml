@@ -39,6 +39,10 @@ jobs:
       - run: python -m pip install -U build
       - run: python -m build
       - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # A re-run of an already-published tag should be a no-op, not a hard
+          # failure on the whole workflow.
+          skip-existing: true
 
   snap:
     name: Build and publish snap
@@ -89,10 +93,16 @@ jobs:
           sudo apt-get install -y ../wayparam_*_all.deb
           wayparam --help
           man -w wayparam
+      - name: Collect artifacts into the workspace
+        # dpkg-buildpackage writes to the parent directory, but
+        # actions/upload-artifact rejects any path containing '..'.
+        run: |
+          mkdir -p dist-deb
+          cp ../wayparam_*_all.deb dist-deb/
       - uses: actions/upload-artifact@v4
         with:
           name: wayparam-deb
-          path: ../wayparam_*_all.deb
+          path: dist-deb/*.deb
       - name: Attach to GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         env:
@@ -101,4 +111,4 @@ jobs:
           # Pushing a tag does not create a Release, and `upload` requires one.
           gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 \
             || gh release create "${GITHUB_REF_NAME}" --generate-notes --verify-tag
-          gh release upload "${GITHUB_REF_NAME}" ../wayparam_*_all.deb --clobber
+          gh release upload "${GITHUB_REF_NAME}" dist-deb/*.deb --clobber
