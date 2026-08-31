@@ -32,3 +32,22 @@ Description: fetch and normalize parameterized URLs from the Wayback CDX API
  which makes the output suitable for sharing and for fuzzing workflows. The
  tool does not crawl the target: it only queries the public Wayback CDX API,
  which makes it usable in passive OSINT and reconnaissance workflows.
+
+Package: wayparam-gui
+Architecture: all
+Depends:
+ wayparam (= ${binary:Version}),
+ ${python3:Depends},
+ ${misc:Depends},
+Description: local web interface for wayparam
+ wayparam collects historical URLs with query parameters from the Internet
+ Archive Wayback CDX API. This package adds wayparam-gui, which serves a small
+ web interface on the loopback interface and streams results to the browser as
+ they are found.
+ .
+ The interface binds to 127.0.0.1 only, requires a per-process random token on
+ every request and rejects unexpected Host headers, because it performs
+ outbound requests on behalf of whoever can reach it.
+ .
+ Install this package only if you want the interface: the wayparam command
+ itself has no use for it.

@@ -52,10 +52,7 @@ def canonicalize_url(url: str, opt: NormalizeOptions) -> str | None:
     - optionally drops tracking params
     - optionally masks values
     """
-    try:
-        parts = urlsplit(url.strip())
-    except Exception:
-        return None
+    parts = urlsplit(url.strip())
 
     if not parts.scheme or not parts.netloc:
         return None

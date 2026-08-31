@@ -64,28 +64,21 @@ class FilterOptions:
 
 
 def _path_extension(url: str) -> str:
-    try:
-        path = urlsplit(url).path
-    except Exception:
-        return ""
-    return PurePosixPath(path).suffix.lower()
+    return PurePosixPath(urlsplit(url).path).suffix.lower()
 
 
 def is_boring(url: str, opt: FilterOptions) -> bool:
-    ext = _path_extension(url)
+    path = urlsplit(url).path
+    ext = PurePosixPath(path).suffix.lower()
 
-    if opt.ext_whitelist is not None:
-        if ext and ext not in opt.ext_whitelist:
+    if ext:
+        if opt.ext_whitelist is not None and ext not in opt.ext_whitelist:
+            return True
+        if ext in opt.ext_blacklist:
             return True
 
-    if ext and ext in opt.ext_blacklist:
-        return True
-
     if opt.path_exclude_regex:
-        path = urlsplit(url).path
-        for rx in opt.path_exclude_regex:
-            if rx.search(path):
-                return True
+        return any(rx.search(path) for rx in opt.path_exclude_regex)
 
     return False
 

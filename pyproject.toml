@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "wayparam"
-version = "0.3.1"
+version = "0.4.0"
 description = "Fetch and normalize parameterized URLs from the Internet Archive Wayback CDX API (OSINT-friendly)."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -33,6 +33,7 @@ dev = [
 
 [project.scripts]
 wayparam = "wayparam.cli:main"
+wayparam-gui = "wayparam.gui:main"
 
 [project.urls]
 Homepage = "https://aleff-github.github.io/wayparam/"
@@ -41,3 +42,6 @@ Issues = "https://github.com/aleff-github/wayparam/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"wayparam.gui" = ["*.html"]

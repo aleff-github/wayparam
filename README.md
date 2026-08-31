@@ -77,6 +77,33 @@ An apt repository (Launchpad PPA) is not published yet. The Debian packaging
 lives in `debian/`; see [Packaging & distribution](docs/packaging-readiness.md)
 for how it is built and what it would take to publish one.
 
+### Web interface (optional)
+
+The interface is a separate, opt-in component: the CLI never depends on it.
+
+```bash
+sudo apt install wayparam-gui      # separate package; pulls in wayparam
+wayparam-gui                       # or: snap run wayparam.gui
+```
+
+It prints a URL containing a one-time token and opens it in your browser:
+
+```
+wayparam UI: http://127.0.0.1:8765/?t=<token>
+```
+
+It binds to **127.0.0.1 only**, requires that token on every request, and
+rejects unexpected `Host` headers — it performs outbound requests on behalf of
+whoever can reach it, so it is deliberately not reachable from the network. To
+use it on a remote box, forward the port instead:
+
+```bash
+ssh -L 8765:127.0.0.1:8765 user@host   # then run wayparam-gui there
+```
+
+Inside the snap, open the printed URL yourself: a confined snap cannot launch
+the host browser.
+
 ### From source
 
 ```bash

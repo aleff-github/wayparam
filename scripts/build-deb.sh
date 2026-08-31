@@ -37,6 +37,7 @@ if [[ "${1:-}" == "--source" ]]; then
 else
   dpkg-buildpackage -us -uc -b
   echo
-  echo ">> built: $(ls -1 ../wayparam_${DEB_VERSION}_all.deb)"
-  echo ">> install with: sudo apt install $ROOT/../wayparam_${DEB_VERSION}_all.deb"
+  echo ">> built:"
+  ls -1 ../wayparam*_"${DEB_VERSION}"_all.deb | sed 's/^/     /'
+  echo ">> the CLI is in wayparam_*.deb; the web UI in wayparam-gui_*.deb"
 fi

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
+from urllib.parse import urlsplit
 
 
 def read_domains(path: str) -> list[str]:
@@ -13,9 +15,6 @@ def read_domains(path: str) -> list[str]:
     - lowercases
     - drops blank/comment lines
     """
-    import sys
-    from urllib.parse import urlsplit
-
     if path == "-":
         content = sys.stdin.read().splitlines()
     else:

@@ -1,0 +1,234 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>wayparam</title>
+<style>
+  :root {
+    --bg: #fbfbfa; --panel: #fff; --ink: #1a1a19; --muted: #6b6b66;
+    --line: #e3e3df; --accent: #A81D33; --ok: #1f7a3d; --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #16161a; --panel: #1e1e23; --ink: #ecece8; --muted: #9a9a94;
+            --line: #2e2e35; --accent: #ff6b81; --ok: #4ade80; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  header { padding: 18px 20px 12px; border-bottom: 1px solid var(--line); }
+  h1 { margin: 0; font-size: 17px; letter-spacing: -.01em; }
+  h1 span { color: var(--muted); font-weight: 400; }
+  main { display: grid; grid-template-columns: 340px 1fr; gap: 0; min-height: calc(100vh - 58px); }
+  @media (max-width: 800px) { main { grid-template-columns: 1fr; } }
+  form { padding: 18px 20px; border-right: 1px solid var(--line); overflow-y: auto; }
+  fieldset { border: 0; padding: 0; margin: 0 0 18px; }
+  legend { font-size: 11px; text-transform: uppercase; letter-spacing: .07em;
+           color: var(--muted); padding: 0 0 6px; }
+  label { display: block; margin-bottom: 10px; }
+  label > span { display: block; font-size: 12px; color: var(--muted); margin-bottom: 3px; }
+  input[type=text], input[type=number], textarea, select {
+    width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px;
+    background: var(--panel); color: var(--ink); font: inherit; }
+  textarea { font-family: var(--mono); font-size: 13px; resize: vertical; min-height: 68px; }
+  input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .check { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+  .check input { margin: 0; accent-color: var(--accent); }
+  .check span { font-size: 13px; color: var(--ink); }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  button { font: inherit; padding: 9px 14px; border-radius: 6px; cursor: pointer; border: 1px solid var(--line); }
+  #go { background: var(--accent); color: #fff; border-color: transparent; font-weight: 600; width: 100%; }
+  button:disabled { opacity: .45; cursor: default; }
+  #out { display: flex; flex-direction: column; min-width: 0; }
+  .bar { display: flex; align-items: center; gap: 10px; padding: 10px 20px;
+         border-bottom: 1px solid var(--line); }
+  .bar .grow { flex: 1; }
+  #count { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; }
+  #results { flex: 1; margin: 0; padding: 12px 20px; overflow: auto;
+             font-family: var(--mono); font-size: 12.5px; white-space: pre; }
+  #results div { padding: 1px 0; }
+  .msg { color: var(--muted); font-family: var(--mono); font-size: 12.5px; }
+  .msg.err { color: var(--accent); }
+  .msg.ok { color: var(--ok); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+  .dot.live { background: var(--accent); animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity: .25; } }
+</style>
+
+<header><h1>wayparam <span>— Wayback CDX URL parameter collector</span></h1></header>
+
+<main>
+  <form id="f">
+    <fieldset>
+      <legend>Target</legend>
+      <label><span>Domains (one per line)</span>
+        <textarea id="domains" placeholder="example.com" autofocus></textarea></label>
+      <div class="check"><input type="checkbox" id="include_subdomains"><span>Include subdomains</span></div>
+      <div class="row">
+        <label><span>From (year/ts)</span><input type="text" id="from_ts" placeholder="2015"></label>
+        <label><span>To</span><input type="text" id="to_ts" placeholder="2024"></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Normalization</legend>
+      <label><span>Placeholder</span><input type="text" id="placeholder" value="FUZZ"></label>
+      <div class="check"><input type="checkbox" id="keep_values"><span>Keep original values</span></div>
+      <div class="check"><input type="checkbox" id="all_urls"><span>Keep URLs without parameters</span></div>
+      <div class="check"><input type="checkbox" id="drop_tracking" checked><span>Drop tracking params</span></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Filters</legend>
+      <label><span>Extension blacklist (blank = defaults)</span>
+        <input type="text" id="ext_blacklist" placeholder=".png,.js,.css"></label>
+      <label><span>Extension whitelist</span>
+        <input type="text" id="ext_whitelist" placeholder=".php,.aspx"></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Network</legend>
+      <div class="row">
+        <label><span>Concurrency</span><input type="number" id="concurrency" value="6" min="1" max="64"></label>
+        <label><span>Req/s (0 = off)</span><input type="number" id="rps" value="0" min="0" step="0.5"></label>
+      </div>
+      <label><span>Proxy</span><input type="text" id="proxy" placeholder="http://127.0.0.1:8080"></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Output</legend>
+      <label><span>Also write files to (blank = stream only)</span>
+        <input type="text" id="outdir" placeholder="results"></label>
+      <label><span>Format</span>
+        <select id="format"><option value="txt">txt</option><option value="jsonl">jsonl</option></select></label>
+    </fieldset>
+
+    <button id="go" type="submit">Start</button>
+  </form>
+
+  <section id="out">
+    <div class="bar">
+      <div class="dot" id="dot"></div>
+      <div id="count">idle</div>
+      <div class="grow"></div>
+      <button id="stop" disabled>Stop</button>
+      <button id="copy" disabled>Copy</button>
+      <button id="save" disabled>Download</button>
+    </div>
+    <div id="results"></div>
+  </section>
+</main>
+
+<script>
+(() => {
+  "use strict";
+  const token = new URLSearchParams(location.search).get("t") || "";
+  const $ = id => document.getElementById(id);
+  const results = $("results"), count = $("count"), dot = $("dot");
+  let urls = [], controller = null;
+
+  const val = id => $(id).value.trim();
+  const on  = id => $(id).checked;
+
+  function msg(text, cls) {
+    const d = document.createElement("div");
+    d.className = "msg " + (cls || "");
+    d.textContent = text;
+    results.appendChild(d);
+    results.scrollTop = results.scrollHeight;
+  }
+
+  function addUrl(u) {
+    urls.push(u);
+    const d = document.createElement("div");
+    d.textContent = u;
+    results.appendChild(d);
+    // Only autoscroll when the user is already at the bottom.
+    if (results.scrollHeight - results.scrollTop - results.clientHeight < 60) {
+      results.scrollTop = results.scrollHeight;
+    }
+    count.textContent = urls.length.toLocaleString() + " URLs";
+  }
+
+  function running(isRunning) {
+    $("go").disabled = isRunning;
+    $("stop").disabled = !isRunning;
+    dot.className = "dot" + (isRunning ? " live" : "");
+    const has = urls.length > 0;
+    $("copy").disabled = !has;
+    $("save").disabled = !has;
+  }
+
+  function payload() {
+    return {
+      domains: val("domains"), include_subdomains: on("include_subdomains"),
+      from_ts: val("from_ts"), to_ts: val("to_ts"),
+      placeholder: val("placeholder") || "FUZZ", keep_values: on("keep_values"),
+      all_urls: on("all_urls"), drop_tracking: on("drop_tracking"),
+      ext_blacklist: val("ext_blacklist"), ext_whitelist: val("ext_whitelist"),
+      concurrency: Number(val("concurrency")) || 6, rps: Number(val("rps")) || 0,
+      proxy: val("proxy"), outdir: val("outdir"), format: val("format")
+    };
+  }
+
+  function handle(ev) {
+    if (ev.type === "url") addUrl(ev.url);
+    else if (ev.type === "start") msg("Searching " + ev.domains.join(", ") + " …");
+    else if (ev.type === "stats") msg(`${ev.domain}: fetched=${ev.fetched} kept=${ev.kept}`, "ok");
+    else if (ev.type === "error") msg((ev.domain ? ev.domain + ": " : "") + ev.message, "err");
+    else if (ev.type === "done") msg("Done.", "ok");
+  }
+
+  $("f").addEventListener("submit", async e => {
+    e.preventDefault();
+    results.textContent = ""; urls = []; count.textContent = "0 URLs";
+    controller = new AbortController();
+    running(true);
+    try {
+      const res = await fetch("/api/run", {
+        method: "POST", signal: controller.signal,
+        headers: { "Content-Type": "application/json", "X-Wayparam-Token": token },
+        body: JSON.stringify(payload())
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: res.statusText }));
+        msg(body.error || ("HTTP " + res.status), "err");
+        return;
+      }
+      const reader = res.body.getReader(), dec = new TextDecoder();
+      let buf = "";
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop();
+        for (const line of lines) if (line) handle(JSON.parse(line));
+      }
+    } catch (err) {
+      if (err.name !== "AbortError") msg(String(err), "err");
+      else msg("Stopped.", "err");
+    } finally {
+      controller = null;
+      running(false);
+    }
+  });
+
+  $("stop").addEventListener("click", () => controller && controller.abort());
+
+  $("copy").addEventListener("click", async () => {
+    await navigator.clipboard.writeText(urls.join("\n"));
+    $("copy").textContent = "Copied";
+    setTimeout(() => ($("copy").textContent = "Copy"), 1200);
+  });
+
+  $("save").addEventListener("click", () => {
+    const blob = new Blob([urls.join("\n") + "\n"], { type: "text/plain" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "wayparam.txt";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  if (!token) msg("No token in the URL: open the link printed by wayparam-gui.", "err");
+})();
+</script>

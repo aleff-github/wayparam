@@ -1,3 +1,10 @@
+wayparam (0.4.0-1) noble; urgency=medium
+
+  * New upstream release.
+  * Split the optional web interface into the new wayparam-gui package.
+
+ -- Aleff <alessandro.greco.1@protonmail.com>  Mon, 31 Aug 2026 20:40:00 +0200
+
 wayparam (0.3.1-1) noble; urgency=medium
 
   * New upstream release.

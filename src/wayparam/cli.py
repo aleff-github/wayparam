@@ -4,28 +4,19 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import inspect
 import logging
 import os
 import sys
 from pathlib import Path
 
-import httpx
-
-from .filters import DEFAULT_EXT_BLACKLIST, FilterOptions, is_boring, parse_ext_set
+from . import __version__
+from .config import RunConfig, build_filter_options
+from .core import RunResult, run
 from .http import HttpConfig
-from .io import ensure_dir, read_domains
-from .normalize import NormalizeOptions, canonicalize_url
-from .output import (
-    UrlRecord,
-    now_utc_iso,
-    open_outfile,
-    print_hint_stderr,
-    print_record_stdout,
-    write_record,
-)
-from .ratelimit import RateLimiter
-from .wayback import CdxOptions, iter_original_urls
+from .io import read_domains
+from .normalize import NormalizeOptions
+from .output import UrlRecord, print_hint_stderr, print_record_stdout
+from .wayback import CdxOptions
 
 log = logging.getLogger("wayparam")
 
@@ -134,6 +125,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "-v", "--verbose", action="count", default=0, help="Increase log verbosity (-v or -vv)."
     )
+    p.add_argument("--version", action="version", version=f"wayparam {__version__}")
     return p
 
 
@@ -159,199 +151,76 @@ def _maybe_print_wayback_vpn_hint(exc: Exception) -> None:
         )
 
 
-def _asyncclient_kwargs(args: argparse.Namespace, limits: httpx.Limits) -> dict:
-    """Support httpx 'proxy' (new) and 'proxies' (old) without pinning versions."""
-    kwargs: dict = {"limits": limits, "follow_redirects": True}
-    if not args.proxy:
-        return kwargs
-
-    try:
-        params = inspect.signature(httpx.AsyncClient).parameters
-        if "proxy" in params:
-            kwargs["proxy"] = args.proxy
-        else:
-            kwargs["proxies"] = args.proxy
-    except Exception:
-        # Fallback: try the new name first
-        kwargs["proxy"] = args.proxy
-    return kwargs
-
-
-async def _process_domain(
-    domain: str,
-    *,
-    client: httpx.AsyncClient,
-    http_cfg: HttpConfig,
-    rate_limiter: RateLimiter | None,
-    cdx_opt: CdxOptions,
-    norm_opt: NormalizeOptions,
-    filt_opt: FilterOptions,
-    outdir: Path,
-    write_files: bool,
-    to_stdout: bool,
-    out_format: str,
-) -> tuple[str, int, int]:
-    fetched = 0
-    kept = 0
-    seen: set[str] = set()
-
-    out_fh = None
-    if write_files:
-        ext = "jsonl" if out_format == "jsonl" else "txt"
-        out_fh = open_outfile(outdir / f"{domain}.{ext}")
-
-    try:
-        async for raw in iter_original_urls(
-            domain,
-            client=client,
-            http_config=http_cfg,
-            rate_limiter=rate_limiter,
-            opt=cdx_opt,
-        ):
-            fetched += 1
-
-            if is_boring(raw, filt_opt):
-                continue
-
-            canon = canonicalize_url(raw, norm_opt)
-            if canon is None:
-                continue
-
-            if is_boring(canon, filt_opt):
-                continue
-
-            if canon in seen:
-                continue
-            seen.add(canon)
-
-            kept += 1
-            rec = UrlRecord(domain=domain, url=canon, fetched_at=now_utc_iso())
-
-            if out_fh:
-                write_record(out_fh, rec, out_format)  # type: ignore[arg-type]
-            if to_stdout:
-                print_record_stdout(rec, out_format)  # type: ignore[arg-type]
-
-    finally:
-        if out_fh:
-            out_fh.close()
-
-    return domain, fetched, kept
-
-
-async def run_async(args: argparse.Namespace) -> int:
-    # Input
+def build_config(args: argparse.Namespace) -> RunConfig:
+    """Translate parsed CLI arguments into a frontend-independent RunConfig."""
     domains = [args.domain.strip().lower()] if args.domain else read_domains(args.list)
 
-    # Output
-    outdir = Path(args.outdir)
-    write_files = not args.no_files
-    if write_files:
-        ensure_dir(outdir)
-
-    if args.no_files and not args.stdout:
-        raise SystemExit("--no-files requires --stdout")
-
-    # Filters
-    if args.ext_blacklist:
-        ext_blacklist = parse_ext_set(args.ext_blacklist)
-    else:
-        ext_blacklist = set(DEFAULT_EXT_BLACKLIST)
-
-    ext_whitelist = parse_ext_set(args.ext_whitelist) if args.ext_whitelist else None
-
-    import re as _re
-
-    path_rx = [_re.compile(x) for x in (args.exclude_path_regex or [])] or None
-    filt_opt = FilterOptions(
-        ext_blacklist=ext_blacklist, ext_whitelist=ext_whitelist, path_exclude_regex=path_rx
+    return RunConfig(
+        domains=domains,
+        outdir=Path(args.outdir),
+        write_files=not args.no_files,
+        out_format=args.format,
+        concurrency=args.concurrency,
+        rps=args.rps,
+        http=HttpConfig(
+            timeout_s=args.timeout,
+            retries=args.retries,
+            user_agent=args.user_agent,
+            proxy=args.proxy,
+        ),
+        cdx=CdxOptions(
+            include_subdomains=args.include_subdomains,
+            collapse=None if args.no_collapse else "urlkey",
+            from_ts=args.from_ts,
+            to_ts=args.to_ts,
+            limit=args.limit,
+            filters=args.filter,
+        ),
+        normalize=NormalizeOptions(
+            placeholder=args.placeholder,
+            keep_values=args.keep_values,
+            only_params=(not args.all_urls),
+            drop_tracking=args.drop_tracking,
+        ),
+        filters=build_filter_options(
+            ext_blacklist=args.ext_blacklist,
+            ext_whitelist=args.ext_whitelist,
+            exclude_path_regex=args.exclude_path_regex,
+        ),
     )
 
-    # Normalization
-    norm_opt = NormalizeOptions(
-        placeholder=args.placeholder,
-        keep_values=args.keep_values,
-        only_params=(not args.all_urls),
-        drop_tracking=args.drop_tracking,
-    )
 
-    # CDX options
-    cdx_opt = CdxOptions(
-        include_subdomains=args.include_subdomains,
-        collapse=None if args.no_collapse else "urlkey",
-        from_ts=args.from_ts,
-        to_ts=args.to_ts,
-        limit=args.limit,
-        filters=args.filter,
-    )
+def _report(result: RunResult, cfg: RunConfig, show_stats: bool) -> int:
+    for domain, exc in result.errors:
+        log.error("%s: %s", domain, exc)
+        _maybe_print_wayback_vpn_hint(exc)
 
-    # HTTP config
-    http_cfg = HttpConfig(
-        timeout_s=args.timeout,
-        retries=args.retries,
-        user_agent=args.user_agent,
-        proxy=args.proxy,
-    )
+    if show_stats:
+        for st in result.stats:
+            print_hint_stderr(f"Stats: {st.domain}: fetched={st.fetched} kept={st.kept}")
 
-    limits = httpx.Limits(
-        max_connections=max(10, args.concurrency * 4),
-        max_keepalive_connections=max(10, args.concurrency * 2),
-    )
-
-    rate_limiter = RateLimiter(args.rps) if args.rps and args.rps > 0 else None
-    sem = asyncio.Semaphore(max(1, args.concurrency))
-
-    async def guarded(d: str):
-        async with sem:
-            return await _process_domain(
-                d,
-                client=client,
-                http_cfg=http_cfg,
-                rate_limiter=rate_limiter,
-                cdx_opt=cdx_opt,
-                norm_opt=norm_opt,
-                filt_opt=filt_opt,
-                outdir=outdir,
-                write_files=write_files,
-                to_stdout=args.stdout,
-                out_format=args.format,
-            )
-
-    async with httpx.AsyncClient(**_asyncclient_kwargs(args, limits)) as client:
-        tasks = [asyncio.create_task(guarded(d)) for d in domains]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-    ok = 0
-    domain_stats: list[tuple[str, int, int]] = []
-
-    for r in results:
-        if isinstance(r, Exception):
-            # A closed stdout is the consumer going away (`| head`), not a
-            # domain failure: let it propagate to main() untouched.
-            if isinstance(r, BrokenPipeError):
-                raise r
-            log.error("Error: %s", r)
-            _maybe_print_wayback_vpn_hint(r)
-            continue
-        domain, fetched, kept = r
-        ok += 1
-        domain_stats.append((domain, fetched, kept))
-        log.info("%s: fetched=%d kept=%d", domain, fetched, kept)
-
-    if args.stats:
-        for d, fetched, kept in domain_stats:
-            print_hint_stderr(f"Stats: {d}: fetched={fetched} kept={kept}")
-
-    return 0 if ok == len(domains) else 2
+    return 0 if len(result.stats) == len(cfg.domains) else 2
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(argv)
+
+    if args.no_files and not args.stdout:
+        parser.error("--no-files requires --stdout")
+
     _setup_logging(args.verbose, args.quiet)
 
     try:
-        return asyncio.run(run_async(args))
+        cfg = build_config(args)
+        on_record = None
+        if args.stdout:
+
+            def on_record(rec: UrlRecord) -> None:
+                print_record_stdout(rec, cfg.out_format)
+
+        result = asyncio.run(run(cfg, on_record=on_record))
+        return _report(result, cfg, args.stats)
     except KeyboardInterrupt:
         return 130
     except BrokenPipeError:

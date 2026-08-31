@@ -25,8 +25,23 @@ class HttpConfig:
     proxy: str | None = None
 
 
+# Picked once per process: rotating the User-Agent between pages of the same
+# pagination sequence serves no purpose and looks like evasion to the archive.
+_SESSION_UA = random.choice(DEFAULT_UAS)
+
+
 def _pick_ua(config: HttpConfig) -> str:
-    return config.user_agent or random.choice(DEFAULT_UAS)
+    return config.user_agent or _SESSION_UA
+
+
+def _backoff(config: HttpConfig, attempt: int) -> float:
+    """Exponential backoff with full jitter.
+
+    Without the jitter, concurrent domains that all hit a 429 retry in
+    lockstep and keep hammering the API at the same instants.
+    """
+    ceiling = min(config.backoff_base_s * (2**attempt), config.max_backoff_s)
+    return random.uniform(0.0, ceiling)
 
 
 async def get_text(
@@ -50,12 +65,9 @@ async def get_text(
                 if retry_after and retry_after.isdigit():
                     await asyncio.sleep(min(int(retry_after), config.max_backoff_s))
                 else:
-                    await asyncio.sleep(
-                        min(config.backoff_base_s * (2**attempt), config.max_backoff_s)
-                    )
+                    await asyncio.sleep(_backoff(config, attempt))
                 continue
 
-            last_status = resp.status_code
             resp.raise_for_status()
             return resp.text
 
@@ -63,7 +75,7 @@ async def get_text(
             last_exc = e
             if attempt >= config.retries:
                 break
-            await asyncio.sleep(min(config.backoff_base_s * (2**attempt), config.max_backoff_s))
+            await asyncio.sleep(_backoff(config, attempt))
 
     detail = f"status={last_status}" if last_status else "no-status"
     raise RuntimeError(f"HTTP request failed after retries ({detail}): {url}") from last_exc

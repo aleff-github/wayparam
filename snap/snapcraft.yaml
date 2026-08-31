@@ -13,6 +13,10 @@ description: |
   making the output suitable for sharing and fuzzing workflows. The tool does
   not crawl targets: it only queries the public Wayback CDX API.
 
+  A local web interface is bundled as `wayparam.gui`. It listens on
+  127.0.0.1 and prints a URL containing a one-time token; open that URL
+  yourself, since a confined snap cannot launch the host browser.
+
   Note on confinement: this snap is strictly confined. It can read/write only
   inside your home directory (and removable media, once connected), so run it
   from a directory under $HOME or pass -o/--outdir accordingly.
@@ -43,6 +47,17 @@ apps:
     command: bin/wayparam
     plugs:
       - network
+      - home
+      - removable-media
+
+  # `wayparam.gui` serves the web UI. A snap is a single bundle, so the UI
+  # cannot be a separate install here the way it is on Debian -- but it costs
+  # only a few tens of KB, and stays inert unless this command is run.
+  gui:
+    command: bin/wayparam-gui
+    plugs:
+      - network
+      - network-bind
       - home
       - removable-media
 

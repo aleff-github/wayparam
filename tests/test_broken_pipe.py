@@ -16,10 +16,10 @@ ARGV = ["-d", "example.com", "--stdout", "--no-files"]
 
 
 def test_main_returns_141_on_broken_pipe(monkeypatch, capfd):
-    async def boom(_args):
+    async def boom(_cfg, **_kw):
         raise BrokenPipeError(32, "Broken pipe")
 
-    monkeypatch.setattr(cli, "run_async", boom)
+    monkeypatch.setattr(cli, "run", boom)
 
     # main() points stdout's descriptor at /dev/null so the interpreter's
     # flush-on-exit stays quiet. Step outside pytest's fd capture and restore
@@ -35,8 +35,8 @@ def test_main_returns_141_on_broken_pipe(monkeypatch, capfd):
 
 
 def test_main_still_returns_130_on_interrupt(monkeypatch):
-    async def boom(_args):
+    async def boom(_cfg, **_kw):
         raise KeyboardInterrupt
 
-    monkeypatch.setattr(cli, "run_async", boom)
+    monkeypatch.setattr(cli, "run", boom)
     assert cli.main(ARGV) == 130

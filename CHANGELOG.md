@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0
+- Added an optional local web interface (`wayparam-gui`), shipped as a separate Debian package and as the `wayparam.gui` snap app
+- Added `--version` to the CLI
+- Refactored: `RunConfig` + `core.run()` decouple the engine from argparse, so any frontend can drive it
+- Fixed thundering-herd retries: HTTP backoff now uses full jitter
+- Fixed User-Agent rotating between pages of the same pagination sequence
+- `--no-files requires --stdout` is now rejected by argparse, before stdin is consumed
+- Errors now name the domain that failed
+- Halved URL parsing per candidate (single `is_boring` call, single `urlsplit` inside it)
+
 ## 0.3.1
 - Fixed BrokenPipeError traceback when the consumer closes the pipe (`--stdout | head`); exits 141 instead
 - Added snap packaging (strict confinement)

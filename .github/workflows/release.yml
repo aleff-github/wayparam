@@ -28,6 +28,9 @@ jobs:
   pypi:
     name: Publish to PyPI
     runs-on: ubuntu-latest
+    # Only a tag publishes. A manual dispatch is for validating the build,
+    # and must never push a release to PyPI as a side effect.
+    if: startsWith(github.ref, 'refs/tags/')
     environment: pypi
     permissions:
       id-token: write   # trusted publishing
@@ -90,15 +93,21 @@ jobs:
         run: lintian --no-tag-display-limit ../wayparam_*.changes || true
       - name: Smoke test
         run: |
-          sudo apt-get install -y ../wayparam_*_all.deb
-          wayparam --help
+          # Installs both binary packages: the CLI and the optional web UI.
+          sudo apt-get install -y ../wayparam_*_all.deb ../wayparam-gui_*_all.deb
+          wayparam --version
           man -w wayparam
+          wayparam-gui --version
+          # The UI must come up and refuse an untokenised request.
+          wayparam-gui --no-browser --port 8799 &
+          for _ in $(seq 30); do curl -sf -o /dev/null http://127.0.0.1:8799/ && break; sleep 0.2; done
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8799/)" = "403"
       - name: Collect artifacts into the workspace
         # dpkg-buildpackage writes to the parent directory, but
         # actions/upload-artifact rejects any path containing '..'.
         run: |
           mkdir -p dist-deb
-          cp ../wayparam_*_all.deb dist-deb/
+          cp ../wayparam*_all.deb dist-deb/
       - uses: actions/upload-artifact@v4
         with:
           name: wayparam-deb
