@@ -6,6 +6,8 @@ import argparse
 import asyncio
 import inspect
 import logging
+import os
+import sys
 from pathlib import Path
 
 import httpx
@@ -324,6 +326,10 @@ async def run_async(args: argparse.Namespace) -> int:
 
     for r in results:
         if isinstance(r, Exception):
+            # A closed stdout is the consumer going away (`| head`), not a
+            # domain failure: let it propagate to main() untouched.
+            if isinstance(r, BrokenPipeError):
+                raise r
             log.error("Error: %s", r)
             _maybe_print_wayback_vpn_hint(r)
             continue
@@ -348,3 +354,17 @@ def main(argv: list[str] | None = None) -> int:
         return asyncio.run(run_async(args))
     except KeyboardInterrupt:
         return 130
+    except BrokenPipeError:
+        # Downstream closed the pipe (e.g. `wayparam -d x --stdout | head`).
+        # Redirect stdout to devnull so the interpreter's flush-on-exit does
+        # not raise a second BrokenPipeError, then exit like a Unix filter
+        # killed by SIGPIPE (128 + 13). See the note on SIGPIPE in the
+        # Python docs for the signal module.
+        try:
+            devnull = os.open(os.devnull, os.O_WRONLY)
+            os.dup2(devnull, sys.stdout.fileno())
+        except (OSError, ValueError):
+            # stdout has no real file descriptor (captured/embedded): nothing
+            # to silence, and nothing to fail over.
+            pass
+        return 141

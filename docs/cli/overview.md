@@ -33,3 +33,5 @@ Diagnostics always go to **stderr**.
 - `0`: all domains processed successfully
 - `2`: partial failure (at least one domain failed)
 - `130`: interrupted (Ctrl+C)
+- `141`: output pipe closed by the consumer (e.g. `wayparam ... --stdout | head`);
+  normal in pipelines, reported quietly

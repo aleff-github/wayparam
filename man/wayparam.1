@@ -1,4 +1,4 @@
-.TH WAYPARAM 1 "December 2025" "wayparam 0.3.0" "User Commands"
+.TH WAYPARAM 1 "August 2026" "wayparam 0.3.1" "User Commands"
 .SH NAME
 wayparam \- fetch and normalize parameterized URLs from the Wayback CDX API
 .SH SYNOPSIS
@@ -199,6 +199,11 @@ Partial failure (one or more domains failed).
 .TP
 .B 130
 Interrupted by user (Ctrl+C).
+.TP
+.B 141
+Output pipe closed by the consumer (for example
+.BR "wayparam -d example.com --stdout | head" ).
+This is normal in pipelines and is reported quietly.
 .SH NOTES
 If requests to the CDX endpoint consistently fail after retries, a VPN/proxy exit node may be blocked or
 rate-limited by

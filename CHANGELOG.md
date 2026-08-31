@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.3.1
+- Fixed BrokenPipeError traceback when the consumer closes the pipe (`--stdout | head`); exits 141 instead
+
 ## 0.3.0
 - Milestone
 
