@@ -4,28 +4,29 @@ export PYBUILD_NAME=wayparam
 # The test suite is fully offline (httpx.MockTransport), so it is safe to run
 # it during the build.
 export PYBUILD_TEST_PYTEST=1
+# Without this, pybuild stages into debian/python3-wayparam -- a package this
+# source does not build -- and the wayparam package would ship empty.
+export PYBUILD_DESTDIR=debian/wayparam
 
 %:
 	dh $@ --with python3 --buildsystem=pybuild
 
-# The optional web UI ships in its own binary package. pybuild decides where
-# it stages the build on its own -- neither debian/tmp nor debian/wayparam can
-# be assumed -- so the staged tree is located at build time instead of being
-# hardcoded, and the tree is printed if anything is missing.
-GUI_REL = usr/lib/python3/dist-packages/wayparam/gui
-
+# The optional web UI ships in its own binary package. The staged
+# dist-packages path is interpreter-versioned at this point, so the directory
+# is located rather than hardcoded, and the whole tree is dumped if anything
+# is not where it should be.
 override_dh_install:
 	dh_install
 	set -e; \
-	script=$$(find debian -type f -path '*/usr/bin/wayparam-gui' ! -path 'debian/wayparam-gui/*' | head -1); \
-	pkgdir=$$(find debian -type d -path "*/$(GUI_REL)" ! -path 'debian/wayparam-gui/*' | head -1); \
-	if [ -z "$$script" ] || [ -z "$$pkgdir" ]; then \
-		echo "ERROR: could not locate the staged web UI. Tree under debian/:"; \
-		find debian -maxdepth 8 \( -name '*.py' -o -name 'wayparam*' \) | sort; \
+	script=debian/wayparam/usr/bin/wayparam-gui; \
+	pkgdir=$$(find debian/wayparam -type d -path '*/dist-packages/wayparam/gui' | head -1); \
+	if [ ! -f "$$script" ] || [ -z "$$pkgdir" ]; then \
+		echo "ERROR: web UI not staged where expected. Tree under debian/:"; \
+		find debian -maxdepth 9 -not -path '*/.debhelper/*' | sort; \
 		exit 1; \
 	fi; \
-	echo "staged script:  $$script"; \
-	echo "staged package: $$pkgdir"; \
-	mkdir -p debian/wayparam-gui/usr/bin debian/wayparam-gui/$(dir $(GUI_REL)); \
+	dest="debian/wayparam-gui/$${pkgdir#debian/wayparam/}"; \
+	echo "moving $$pkgdir -> $$dest"; \
+	mkdir -p debian/wayparam-gui/usr/bin "$$(dirname "$$dest")"; \
 	mv "$$script" debian/wayparam-gui/usr/bin/; \
-	mv "$$pkgdir" debian/wayparam-gui/$(GUI_REL)
+	mv "$$pkgdir" "$$dest"

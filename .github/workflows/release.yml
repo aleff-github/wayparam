@@ -98,6 +98,12 @@ jobs:
           wayparam --version
           man -w wayparam
           wayparam-gui --version
+          # The split must be real: neither package may be empty, and the
+          # page itself has to ship or the UI serves nothing.
+          dpkg -L wayparam | grep -q /usr/bin/wayparam
+          dpkg -L wayparam-gui | grep -q /usr/bin/wayparam-gui
+          dpkg -L wayparam-gui | grep -q 'gui/index.html'
+          ! dpkg -L wayparam | grep -q 'gui/index.html' 
           # The UI must come up and refuse an untokenised request.
           wayparam-gui --no-browser --port 8799 &
           for _ in $(seq 30); do curl -sf -o /dev/null http://127.0.0.1:8799/ && break; sleep 0.2; done
