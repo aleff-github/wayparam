@@ -8,7 +8,14 @@ export PYBUILD_TEST_PYTEST=1
 %:
 	dh $@ --with python3 --buildsystem=pybuild
 
-# Two binary packages are built from this source, so stage everything in
-# debian/tmp and let the .install files decide what lands where.
-override_dh_auto_install:
-	dh_auto_install --destdir=debian/tmp
+# pybuild installs the whole distribution into debian/wayparam, and does not
+# honour a --destdir of debian/tmp, so the optional web UI is split out here
+# explicitly rather than through .install globs.
+GUI_PKGDIR = usr/lib/python3/dist-packages/wayparam/gui
+
+override_dh_install:
+	dh_install
+	mkdir -p debian/wayparam-gui/usr/bin \
+	         debian/wayparam-gui/usr/lib/python3/dist-packages/wayparam
+	mv debian/wayparam/usr/bin/wayparam-gui debian/wayparam-gui/usr/bin/
+	mv debian/wayparam/$(GUI_PKGDIR) debian/wayparam-gui/$(GUI_PKGDIR)
