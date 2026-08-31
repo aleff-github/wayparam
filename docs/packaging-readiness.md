@@ -9,8 +9,8 @@ through the three supported channels: **PyPI**, **Snap Store** and **apt**.
 | --- | --- |
 | `pyproject.toml` | PEP 621 metadata + `wayparam` console entry point |
 | `man/wayparam.1` | manpage, installed by the Debian package |
-| `snap/snapcraft.yaml` | Snap recipe (core22, strict confinement) |
-| `debian/` | Debian source package (PPA, standalone `.deb`, Debian/Kali) |
+| `snap/snapcraft.yaml` | Snap recipe (core22, strict confinement, two apps) |
+| `debian/` | Debian source package, building **two** binary packages |
 | `scripts/build-deb.sh` | local `.deb` / source-package build helper |
 | `.github/workflows/release.yml` | publishes all three channels on a `v*` tag |
 
@@ -65,6 +65,16 @@ sudo snap install --dangerous ./wayparam_*.snap
 wayparam --help
 ```
 
+### The two snap apps
+
+`wayparam` is the CLI; `wayparam.gui` serves the web UI and additionally holds
+`network-bind` so it can listen on the loopback interface. A snap is a single
+bundle, so the UI cannot be a separate install here the way it is on Debian --
+but it adds only tens of KB and never runs unless that command is invoked.
+
+Inside the snap the UI cannot launch the host browser (no desktop interface by
+design), so it prints its URL and the user opens it.
+
 ### Confinement notes
 
 The snap is **strictly confined**, with `network`, `home` and `removable-media`
@@ -88,11 +98,32 @@ plugs. Consequences to keep in mind:
 There are three routes, in increasing order of effort. They all reuse the same
 `debian/` directory.
 
+### The two binary packages
+
+One source package builds both:
+
+| Package | Contents | Depends on |
+| --- | --- | --- |
+| `wayparam` | CLI, core modules, manpage | `python3-httpx (>= 0.26.0)` |
+| `wayparam-gui` | `wayparam-gui` and `wayparam/gui/` only | `wayparam (= ${binary:Version})` |
+
+pybuild would otherwise stage into `debian/python3-wayparam`, a package this
+source does not build, which would leave `wayparam` empty -- hence the explicit
+`PYBUILD_DESTDIR`. The staged `dist-packages` path is interpreter-versioned at
+`dh_install` time, so `debian/rules` locates it rather than hardcoding it, and
+dumps the tree under `debian/` when it cannot.
+
+The CI smoke test asserts the split is real: that each package holds its own
+executable, and that `index.html` ships with the UI and *not* with the CLI. A
+mis-split would otherwise pass unnoticed.
+
 ### 3a. `.deb` attached to the GitHub Release (already automated)
 
 ```bash
-wget https://github.com/aleff-github/wayparam/releases/latest/download/wayparam_0.3.1-1_all.deb
-sudo apt install ./wayparam_0.3.1-1_all.deb
+wget https://github.com/aleff-github/wayparam/releases/latest/download/wayparam_0.4.0-1_all.deb
+sudo apt install ./wayparam_0.4.0-1_all.deb
+# optional, for the web interface:
+sudo apt install ./wayparam-gui_0.4.0-1_all.deb
 ```
 
 No infrastructure needed, but users get no automatic updates.
@@ -109,11 +140,11 @@ with updates through the normal apt upgrade path. Ubuntu only.
 
    ```bash
    ./scripts/build-deb.sh --source
-   dput ppa:<your-launchpad-user>/wayparam ../wayparam_0.3.1-1_source.changes
+   dput ppa:<your-launchpad-user>/wayparam ../wayparam_0.4.0-1_source.changes
    ```
 
 4. For extra series, rebuild with the series name changed in `debian/changelog`
-   (or use `backportpackage`) and bump the revision, e.g. `0.3.1-1~noble1`.
+   (or use `backportpackage`) and bump the revision, e.g. `0.4.0-1~noble1`.
 
 ### 3c. Debian / Kali proper
 
