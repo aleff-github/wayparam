@@ -1,10 +1,7 @@
 # wayparam
 
-![Clones (tracked)](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/aleff-github/wayparam/main/.github/traffic/clones-total.json&color=A81D33)
 [![wayparam on the Snap Store](https://snapcraft.io/wayparam/badge.svg)](https://snapcraft.io/wayparam)
 [![PyPI](https://img.shields.io/pypi/v/wayparam?color=A81D33)](https://pypi.org/project/wayparam/)
-
-
 
 **wayparam** is a modern, cross-platform CLI tool to **fetch historical URLs from the Internet Archive Wayback CDX API**, filter out “boring” URLs (static assets), and **normalize query parameters** so you can focus on endpoints that actually matter.
 
