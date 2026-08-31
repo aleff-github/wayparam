@@ -15,3 +15,18 @@ __pycache__/
 dist/
 build/
 *.egg-info/
+
+# ---------- Debian packaging build artifacts ----------
+.pybuild/
+debian/.debhelper/
+debian/files
+debian/debhelper-build-stamp
+debian/wayparam/
+debian/wayparam.substvars
+debian/*.log
+
+# ---------- Snap build artifacts ----------
+*.snap
+parts/
+prime/
+stage/

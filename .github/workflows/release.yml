@@ -1,0 +1,104 @@
+name: Release
+
+# Publishes wayparam on a tag push (e.g. v0.3.1):
+#   * PyPI            -> pip / pipx install wayparam
+#   * Snap Store      -> snap install wayparam
+#   * GitHub Release  -> .deb asset (apt install ./wayparam_*.deb)
+#
+# Required one-time setup:
+#   * PyPI: the project already exists, so add the Trusted Publisher from
+#     "Manage project -> Publishing" (owner aleff-github, repo wayparam,
+#     workflow release.yml, environment pypi). No token needed. If you would
+#     rather keep uploading with twine by hand, just delete the "pypi" job
+#     below - the snap and deb jobs are independent.
+#   * Snap: `snapcraft register wayparam`, then
+#     `snapcraft export-login --snaps wayparam --acls package_access,package_push,package_update,package_release -`
+#     and store the output as the SNAPCRAFT_STORE_CREDENTIALS repo secret.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pypi:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write   # trusted publishing
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -U build
+      - run: python -m build
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  snap:
+    name: Build and publish snap
+    runs-on: ubuntu-latest
+    env:
+      # Mirrored into the environment so the publish step can test for it:
+      # `secrets` is not available in a step-level `if`.
+      SNAP_CREDS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: snapcore/action-build@v1
+        id: build
+      - name: Smoke test the snap
+        run: |
+          sudo snap install --dangerous "${{ steps.build.outputs.snap }}"
+          wayparam --help
+      - uses: snapcore/action-publish@v1
+        # Skip rather than fail when the store credentials are not set up yet;
+        # the build and smoke test above still gate the tag.
+        if: startsWith(github.ref, 'refs/tags/') && env.SNAP_CREDS != ''
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        with:
+          snap: ${{ steps.build.outputs.snap }}
+          release: stable
+
+  deb:
+    name: Build .deb
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # attach the .deb to the release
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential devscripts debhelper dh-python python3-all \
+            python3-setuptools pybuild-plugin-pyproject python3-httpx python3-pytest lintian
+      - name: Build package
+        run: ./scripts/build-deb.sh
+      - name: Lintian
+        run: lintian --no-tag-display-limit ../wayparam_*.changes || true
+      - name: Smoke test
+        run: |
+          sudo apt-get install -y ../wayparam_*_all.deb
+          wayparam --help
+          man -w wayparam
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wayparam-deb
+          path: ../wayparam_*_all.deb
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Pushing a tag does not create a Release, and `upload` requires one.
+          gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 \
+            || gh release create "${GITHUB_REF_NAME}" --generate-notes --verify-tag
+          gh release upload "${GITHUB_REF_NAME}" ../wayparam_*_all.deb --clobber

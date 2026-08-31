@@ -1,0 +1,5 @@
+# Keep Debian packaging out of the upstream (.orig) tarball produced by
+# `git archive` — it belongs to the .debian.tar.xz, and lintian complains
+# otherwise (source-contains-debian-dir).
+debian export-ignore
+.gitattributes export-ignore

@@ -1,6 +1,8 @@
 # wayparam
 
 ![Clones (tracked)](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/aleff-github/wayparam/main/.github/traffic/clones-total.json&color=A81D33)
+[![wayparam on the Snap Store](https://snapcraft.io/wayparam/badge.svg)](https://snapcraft.io/wayparam)
+[![PyPI](https://img.shields.io/pypi/v/wayparam?color=A81D33)](https://pypi.org/project/wayparam/)
 
 
 
@@ -50,8 +52,33 @@ http://www.example.com/?format=FUZZ&retailerId=FUZZ
 ### From PyPI (recommended)
 
 ```bash
+pipx install wayparam     # isolated, keeps the CLI on your PATH
+# or
 pip install wayparam
 ```
+
+### Snap (Linux)
+
+```bash
+sudo snap install wayparam
+```
+
+The snap is strictly confined: it can write only inside your home directory, so
+run it from a directory under `$HOME` (or point `-o/--outdir` there). To also
+write to mounted media: `sudo snap connect wayparam:removable-media`.
+
+### apt (Debian/Ubuntu/Kali)
+
+A `.deb` is attached to each [GitHub release](https://github.com/aleff-github/wayparam/releases)
+and installs the `wayparam(1)` manpage alongside the CLI:
+
+```bash
+sudo apt install ./wayparam_<version>_all.deb
+```
+
+An apt repository (Launchpad PPA) is not published yet. The Debian packaging
+lives in `debian/`; see [Packaging & distribution](docs/packaging-readiness.md)
+for how it is built and what it would take to publish one.
 
 ### From source
 

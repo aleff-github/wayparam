@@ -2,6 +2,9 @@
 
 ## 0.3.1
 - Fixed BrokenPipeError traceback when the consumer closes the pipe (`--stdout | head`); exits 141 instead
+- Added snap packaging (strict confinement)
+- Added Debian packaging (PPA, standalone .deb, Debian/Kali)
+- Added release workflow for PyPI, Snap Store and GitHub Releases
 
 ## 0.3.0
 - Milestone

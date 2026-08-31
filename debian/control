@@ -1,0 +1,34 @@
+Source: wayparam
+Section: net
+Priority: optional
+Maintainer: Aleff <alessandro.greco.1@protonmail.com>
+Build-Depends:
+ debhelper-compat (= 13),
+ dh-python,
+ python3-all,
+ python3-setuptools,
+ pybuild-plugin-pyproject,
+Build-Depends-Indep:
+ python3-httpx (>= 0.26.0),
+ python3-pytest <!nocheck>,
+Standards-Version: 4.7.0
+Rules-Requires-Root: no
+Homepage: https://github.com/aleff-github/wayparam
+Vcs-Git: https://github.com/aleff-github/wayparam.git
+Vcs-Browser: https://github.com/aleff-github/wayparam
+
+Package: wayparam
+Architecture: all
+Depends:
+ ${python3:Depends},
+ ${misc:Depends},
+Description: fetch and normalize parameterized URLs from the Wayback CDX API
+ wayparam queries the Internet Archive Wayback Machine CDX API to retrieve
+ historical URLs for a host (or a list of hosts), filters out common
+ static/boring URLs, and outputs normalized URLs that contain query
+ parameters.
+ .
+ By default query parameter values are replaced with a placeholder (FUZZ),
+ which makes the output suitable for sharing and for fuzzing workflows. The
+ tool does not crawl the target: it only queries the public Wayback CDX API,
+ which makes it usable in passive OSINT and reconnaissance workflows.

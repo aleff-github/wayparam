@@ -1,0 +1,12 @@
+wayparam (0.3.1-1) noble; urgency=medium
+
+  * New upstream release.
+  * Exit quietly (141) when the output pipe is closed by the consumer.
+
+ -- Aleff <alessandro.greco.1@protonmail.com>  Mon, 31 Aug 2026 17:30:00 +0200
+
+wayparam (0.3.0-1) noble; urgency=medium
+
+  * Initial Debian packaging.
+
+ -- Aleff <alessandro.greco.1@protonmail.com>  Mon, 31 Aug 2026 16:54:26 +0200
