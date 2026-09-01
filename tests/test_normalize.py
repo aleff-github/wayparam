@@ -20,3 +20,18 @@ def test_canonicalize_drops_tracking_params():
 def test_only_params_filters_urls_without_query():
     opt = NormalizeOptions(only_params=True)
     assert canonicalize_url("https://example.com/path", opt) is None
+
+
+def test_identical_parameter_pairs_are_collapsed():
+    """Masking turns ?id=1&id=2&id=3 into one pair, not three identical ones."""
+    opt = NormalizeOptions()
+    assert canonicalize_url("https://example.com/p?id=1&id=2&id=3&x=9", opt) == (
+        "https://example.com/p?id=FUZZ&x=FUZZ"
+    )
+
+
+def test_distinct_values_survive_when_values_are_kept():
+    opt = NormalizeOptions(keep_values=True)
+    assert canonicalize_url("https://example.com/p?t=a&t=b&t=a", opt) == (
+        "https://example.com/p?t=a&t=b"
+    )

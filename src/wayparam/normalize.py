@@ -85,6 +85,17 @@ def canonicalize_url(url: str, opt: NormalizeOptions) -> str | None:
             continue
         out.append((k, v if opt.keep_values else opt.placeholder))
 
+    # Masking collapses distinct values, so `?id=1&id=2` would otherwise come
+    # out as `?id=FUZZ&id=FUZZ`. Identical pairs add nothing either way.
+    seen_pairs: set[tuple[str, str]] = set()
+    unique: list[tuple[str, str]] = []
+    for kv in out:
+        if kv in seen_pairs:
+            continue
+        seen_pairs.add(kv)
+        unique.append(kv)
+    out = unique
+
     if opt.sort_params:
         out.sort(key=lambda kv: (kv[0].lower(), kv[0], kv[1]))
 
