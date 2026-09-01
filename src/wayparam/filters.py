@@ -63,18 +63,19 @@ class FilterOptions:
     path_exclude_regex: list[re.Pattern] | None = None
 
 
-def _path_extension(url: str) -> str:
-    return PurePosixPath(urlsplit(url).path).suffix.lower()
-
-
 def is_boring(url: str, opt: FilterOptions) -> bool:
     path = urlsplit(url).path
     ext = PurePosixPath(path).suffix.lower()
 
     if ext:
-        if opt.ext_whitelist is not None and ext not in opt.ext_whitelist:
-            return True
-        if ext in opt.ext_blacklist:
+        # A whitelist is an exhaustive statement of what to keep, so it
+        # replaces the blacklist rather than being narrowed by it. Otherwise
+        # `--ext-whitelist .png` would keep nothing at all, .png being on the
+        # default blacklist.
+        if opt.ext_whitelist is not None:
+            if ext not in opt.ext_whitelist:
+                return True
+        elif ext in opt.ext_blacklist:
             return True
 
     if opt.path_exclude_regex:
