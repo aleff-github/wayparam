@@ -1,4 +1,4 @@
-.TH WAYPARAM 1 "August 2026" "wayparam 0.4.0" "User Commands"
+.TH WAYPARAM 1 "September 2026" "wayparam 0.4.0" "User Commands"
 .SH NAME
 wayparam \- fetch and normalize parameterized URLs from the Wayback CDX API
 .SH SYNOPSIS
@@ -90,14 +90,38 @@ or
 Only include captures up to this timestamp/year.
 .TP
 .BR \-\-no\-collapse
-Disable CDX collapse=urlkey (may return more duplicates).
+Disable CDX collapse=urlkey (returns more duplicates and more data).
+.TP
+.BR \-\-pagination " " \fIauto|blocks|resume\fR
+How to walk a result that does not fit in one response (default: auto). The CDX
+API offers two mechanisms: resumeKey paging, whose cost follows the size of the
+filtered result but which drops one row at each page boundary while collapse is
+on, and block paging (showNumPages/page), which is lossless but whose cost
+follows the size of the domain's index.
+.B auto
+sends one resumeKey request and stops there if the whole result arrived -- a
+single response has no boundary to lose anything at -- and otherwise restarts
+through the block API.
+.TP
+.BR \-\-block\-size " " \fIN\fR
+CDX index blocks per request in block mode (default: 100). Larger means fewer
+but slower and heavier responses.
 .TP
 .BR \-\-filter " " \fIFILTER\fR
 Add a CDX filter string (repeatable). Example:
 .IR statuscode:200 .
 .TP
 .BR \-\-limit " " \fIN\fR
-CDX page size / limit per request (default: 50000).
+CDX rows per request in resumeKey mode. This is a page size, not a cap on
+results (default: 50000). See
+.BR \-\-max\-results
+to bound a run.
+.TP
+.BR \-\-max\-results " " \fIN\fR
+Stop the whole run after this many URLs. The budget is global, shared by every
+domain in the run (default: 0, no cap). A run stopped by the budget exits 0, and
+.BR \-\-stats
+marks the affected domains as incomplete.
 .SS Normalization and Filtering
 .TP
 .BR \-\-placeholder " " \fISTR\fR
@@ -118,7 +142,9 @@ Comma-separated list of extensions to exclude (overrides defaults), e.g.
 .IR ".png,.jpg,.css" .
 .TP
 .BR \-\-ext\-whitelist " " \fICSV\fR
-Comma-separated list of extensions to allow; anything else is excluded.
+Comma-separated list of extensions to allow; anything else is excluded. A
+whitelist replaces the blacklist rather than being narrowed by it. Paths with no
+extension are not judged by extension and pass either way.
 .TP
 .BR \-\-exclude\-path\-regex " " \fIREGEX\fR
 Regex to exclude URLs by path (repeatable).

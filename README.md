@@ -173,7 +173,10 @@ wayparam -d example.com --ext-blacklist ".png,.jpg,.css,.js" --exclude-path-rege
 
    * Requests are sent to the CDX endpoint (Wayback Machine)
    * Uses `matchType=host` by default, or `matchType=domain` when `--include-subdomains` is enabled
-   * Uses pagination (resumeKey) when the API provides it
+   * Walks multi-page results losslessly: one probe request, then the block
+     pagination API (`showNumPages`/`page`) when the result spans pages, because
+     the `resumeKey` walk silently drops one row per boundary while `collapse`
+     is enabled
 
 3. **Filter “boring” URLs**
 
@@ -202,7 +205,9 @@ wayparam -d example.com --ext-blacklist ".png,.jpg,.css,.js" --exclude-path-rege
 ## Output behavior (important for pipelines)
 
 * **stdout**: only results (URLs or JSONL) when `--stdout` is enabled
-* **stderr**: logs, errors, hints (VPN/proxy), optional stats
+* **stderr**: logs, errors, hints (VPN/proxy), optional stats, and a live
+  progress line — the progress line is drawn **only when stderr is a terminal**,
+  so redirecting or piping stderr stays clean
 
 This means you can safely do:
 
@@ -220,6 +225,11 @@ wayparam -d example.com --stdout --no-files | sort -u > urls.txt
 * `--from 2019` / `--to 2021` (or full timestamps like `20190101000000`)
 * `--filter statuscode:200` (repeatable)
 * `--no-collapse` (more duplicates, more data)
+* `--pagination auto|blocks|resume` — how to walk a multi-page result. The
+  default `auto` is **lossless**: the CDX `resumeKey` walk drops one URL at each
+  page boundary while `collapse` is on, so wayparam probes with one request and
+  switches to the block API only when the result actually spans pages.
+* `--block-size 100` (CDX index blocks per request in block mode)
 
 ### Normalization
 
@@ -236,6 +246,7 @@ wayparam -d example.com --stdout --no-files | sort -u > urls.txt
 
 ### Performance / network
 
+* `--max-results 500` (global cap on emitted URLs; `--limit` is only the CDX page size)
 * `--concurrency 8`
 * `--rps 1` (recommended when using VPNs / noisy networks)
 * `--timeout 30`

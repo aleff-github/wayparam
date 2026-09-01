@@ -2,8 +2,20 @@ wayparam (0.4.0-1) noble; urgency=medium
 
   * New upstream release.
   * Split the optional web interface into the new wayparam-gui package.
+  * Fix silent data loss when a result spans several CDX pages: the resumeKey
+    walk drops one URL per page boundary while collapse is on. The new default
+    (--pagination auto) probes with a single request and switches to the
+    lossless block API only when the result really spans pages.
+  * Fix --ext-whitelist being cancelled out by the default extension blacklist.
+  * Retry truncated CDX responses instead of failing the domain outright.
+  * Add --max-results, a global cap so a run can be bounded, and a progress
+    line on stderr when it is a terminal.
+  * A domain that fails partway through now keeps the stats it earned.
+  * Turn malformed input into usage errors instead of tracebacks, in both the
+    CLI and the web interface.
+  * Cut peak memory on large runs by streaming CDX block pages.
 
- -- Aleff <alessandro.greco.1@protonmail.com>  Mon, 31 Aug 2026 20:40:00 +0200
+ -- Aleff <alessandro.greco.1@protonmail.com>  Tue, 01 Sep 2026 15:15:15 +0200
 
 wayparam (0.3.1-1) noble; urgency=medium
 

@@ -152,10 +152,67 @@ Disable `collapse=urlkey`.
 
 **Default:** collapse enabled (dedup at CDX side)
 
-Disabling collapse may return more duplicates and increase output size:
-```bash
-wayparam -d example.com --no-collapse
+Disabling collapse returns more duplicates and increases transfer size. It used
+to also be the only lossless way to page through a large result; that is no
+longer the case — see `--pagination` below.
+
+### `--pagination {auto,blocks,resume}`
+How to walk a result that does not fit in one response. The CDX API offers two
+mechanisms and **they are not equivalent**:
+
+| mode | requests scale with | lossless with `collapse`? |
+|---|---|---|
+| `resume` (`showResumeKey`) | the size of the **filtered result** | **no** — drops one row per page boundary |
+| `blocks` (`showNumPages`/`page`) | the size of the domain's **index** | yes |
+
+**Default:** `auto` — send one `resume`-style request; if the whole result came
+back in it there is no page boundary, so nothing can be lost and the run stops
+there for the price of a single request. Only when that first response carries a
+`resumeKey` does wayparam restart through the block API, which costs one extra
+request but is exact.
+
+Measured against the live API on the same query, paged 18 ways:
+
 ```
+reference (single response) : 4684 URLs
+--pagination resume         : 4669 URLs   (15 lost)
+--pagination blocks         : 4684 URLs   (0 lost)
+```
+
+Use `blocks` to force the exact walk, or `resume` if you knowingly want the
+cheaper-but-lossy one; `resume` warns on stderr the first time it paginates with
+`collapse` on. If the API reports that block pagination is unavailable for a
+query (it answers `-`), wayparam says so and falls back to `resume`.
+
+### `--block-size N`
+CDX index blocks per request in block mode.
+
+**Default:** 100
+
+Larger values mean fewer requests but slower, heavier responses, and the first
+results only appear once one arrives — a single block page can be tens of
+megabytes. Smaller values stream sooner at the cost of more requests.
+
+### `--limit N`
+How many CDX rows to ask for per request **in `resume` mode**. This is a page
+size, not a cap on results; use `--max-results` to bound a run. It also decides
+how much `auto` will pull in its probe before concluding the result spans pages.
+
+**Default:** 50000
+
+### `--max-results N`
+Stop the whole run once this many URLs have been emitted. The budget is
+**global**, shared by every domain in the run, so with several domains whichever
+gets there first uses it up.
+
+**Default:** 0 (no cap)
+
+```bash
+wayparam -d example.com --stdout --no-files --max-results 500
+```
+
+A run stopped by the budget is a success (exit 0), and `--stats` marks the
+affected domains `(incomplete)`.
 
 ### `--filter FILTER`
 Pass a CDX filter (repeatable). This is forwarded to the CDX API as-is.
@@ -170,16 +227,6 @@ wayparam -d example.com --filter statuscode:200
 You can repeat:
 ```bash
 wayparam -d example.com --filter statuscode:200 --filter mimetype:text/html
-```
-
-### `--limit N`
-CDX page size (limit per request).
-
-**Default:** `50000`
-
-Example:
-```bash
-wayparam -d example.com --limit 10000
 ```
 
 ---
@@ -246,6 +293,11 @@ wayparam -d example.com --ext-blacklist ".png,.jpg,.css,.js"
 Comma-separated list of extensions to allow. Anything else is excluded.
 
 **Default:** none
+
+A whitelist **replaces** the blacklist rather than being narrowed by it, so
+`--ext-whitelist ".png"` keeps `.png` even though it is on the default
+blacklist. URLs whose path has no extension are never judged by extension and
+pass either way; `--exclude-path-regex` still applies.
 
 Example (only keep `.php` and `.asp`):
 ```bash
