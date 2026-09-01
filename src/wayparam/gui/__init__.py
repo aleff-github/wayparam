@@ -43,7 +43,11 @@ def _open_browser(url: str) -> None:
 def main(argv: list[str] | None = None) -> int:
     args = build_arg_parser().parse_args(argv)
     logging.basicConfig(
-        level=logging.DEBUG if args.verbose >= 2 else logging.INFO if args.verbose else logging.WARNING,
+        level=logging.DEBUG
+        if args.verbose >= 2
+        else logging.INFO
+        if args.verbose
+        else logging.WARNING,
         format="%(levelname)s %(message)s",
     )
 
