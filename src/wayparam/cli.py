@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import logging
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -16,7 +17,7 @@ from .http import HttpConfig
 from .io import read_domains
 from .normalize import NormalizeOptions
 from .output import UrlRecord, print_hint_stderr, print_record_stdout
-from .wayback import CdxOptions
+from .wayback import PAGINATION_MODES, CdxOptions
 
 log = logging.getLogger("wayparam")
 
@@ -68,7 +69,35 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=None,
         help="CDX filter string (repeatable). Example: statuscode:200",
     )
-    p.add_argument("--limit", type=int, default=50000, help="CDX page size (default: 50000).")
+    p.add_argument(
+        "--limit",
+        type=int,
+        default=50000,
+        help="CDX rows per request in resumeKey mode -- not a cap on results "
+        "(default: 50000). Use --max-results to bound a run.",
+    )
+    p.add_argument(
+        "--pagination",
+        choices=list(PAGINATION_MODES),
+        default="auto",
+        help="How to walk multi-page results: 'auto' probes with one request and "
+        "switches to the block API only when the result spans pages; 'blocks' always "
+        "uses it; 'resume' uses resumeKey paging, which drops one URL per page "
+        "boundary while collapse is on (default: auto).",
+    )
+    p.add_argument(
+        "--block-size",
+        type=int,
+        default=100,
+        help="CDX index blocks per request in block mode (default: 100). Larger means "
+        "fewer but slower and heavier responses.",
+    )
+    p.add_argument(
+        "--max-results",
+        type=int,
+        default=0,
+        help="Stop the whole run after this many URLs (0 = no cap).",
+    )
 
     # Normalization/filtering options
     p.add_argument(
@@ -141,6 +170,42 @@ def _setup_logging(verbosity: int, quiet: bool) -> None:
     logging.basicConfig(level=level, format="%(levelname)s %(message)s")
 
 
+class _ProgressLine:
+    """A single self-overwriting status line on stderr.
+
+    Only used on a terminal: in a pipeline the carriage returns would be
+    noise, and stderr is where a `2>` redirect collects real diagnostics.
+    """
+
+    def __init__(self) -> None:
+        self._per_domain: dict[str, tuple[int, int]] = {}
+        self._drawn = False
+
+    def __call__(self, domain: str, fetched: int, kept: int) -> None:
+        self._per_domain[domain] = (fetched, kept)
+        total_fetched = sum(f for f, _ in self._per_domain.values())
+        total_kept = sum(k for _, k in self._per_domain.values())
+        label = domain if len(self._per_domain) == 1 else f"{len(self._per_domain)} domains"
+        print(
+            f"\r{label}: fetched={total_fetched} kept={total_kept}\x1b[K",
+            end="",
+            file=sys.stderr,
+            flush=True,
+        )
+        self._drawn = True
+
+    def clear(self) -> None:
+        if self._drawn:
+            print("\r\x1b[K", end="", file=sys.stderr, flush=True)
+            self._drawn = False
+
+
+def _make_progress(quiet: bool) -> _ProgressLine | None:
+    if quiet or not sys.stderr.isatty():
+        return None
+    return _ProgressLine()
+
+
 def _maybe_print_wayback_vpn_hint(exc: Exception) -> None:
     msg = str(exc)
     if "web.archive.org/cdx/search/cdx" in msg and "failed after retries" in msg.lower():
@@ -160,6 +225,7 @@ def build_config(args: argparse.Namespace) -> RunConfig:
         outdir=Path(args.outdir),
         write_files=not args.no_files,
         out_format=args.format,
+        max_results=max(0, args.max_results),
         concurrency=args.concurrency,
         rps=args.rps,
         http=HttpConfig(
@@ -175,6 +241,8 @@ def build_config(args: argparse.Namespace) -> RunConfig:
             to_ts=args.to_ts,
             limit=args.limit,
             filters=args.filter,
+            pagination=args.pagination,
+            block_size=max(1, args.block_size),
         ),
         normalize=NormalizeOptions(
             placeholder=args.placeholder,
@@ -197,9 +265,12 @@ def _report(result: RunResult, cfg: RunConfig, show_stats: bool) -> int:
 
     if show_stats:
         for st in result.stats:
-            print_hint_stderr(f"Stats: {st.domain}: fetched={st.fetched} kept={st.kept}")
+            suffix = "" if st.complete else " (incomplete)"
+            print_hint_stderr(f"Stats: {st.domain}: fetched={st.fetched} kept={st.kept}{suffix}")
 
-    return 0 if len(result.stats) == len(cfg.domains) else 2
+    # A failing domain now still reports the stats it produced, so the exit
+    # code has to come from the errors rather than from a count of stats.
+    return 0 if result.ok else 2
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -211,15 +282,31 @@ def main(argv: list[str] | None = None) -> int:
 
     _setup_logging(args.verbose, args.quiet)
 
+    # Bad input is a usage error, not a crash: argparse exits 2 with a one-line
+    # message instead of unwinding a traceback at the user.
     try:
         cfg = build_config(args)
+    except re.error as exc:
+        parser.error(f"invalid --exclude-path-regex: {exc}")
+    except OSError as exc:
+        parser.error(f"cannot read the domain list: {exc}")
+
+    if not cfg.domains:
+        parser.error("no domains to process")
+
+    progress = _make_progress(args.quiet)
+    try:
         on_record = None
         if args.stdout:
 
             def on_record(rec: UrlRecord) -> None:
                 print_record_stdout(rec, cfg.out_format)
 
-        result = asyncio.run(run(cfg, on_record=on_record))
+        result = asyncio.run(run(cfg, on_record=on_record, on_progress=progress))
+        # Erase the status line before anything else writes to stderr, or the
+        # report lands on the same line as the last progress update.
+        if progress:
+            progress.clear()
         return _report(result, cfg, args.stats)
     except KeyboardInterrupt:
         return 130
@@ -237,3 +324,7 @@ def main(argv: list[str] | None = None) -> int:
             # to silence, and nothing to fail over.
             pass
         return 141
+    finally:
+        # However main() leaves, the terminal must not keep a half-drawn line.
+        if progress:
+            progress.clear()

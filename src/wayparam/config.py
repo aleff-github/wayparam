@@ -25,6 +25,8 @@ class RunConfig:
     outdir: Path = Path("results")
     write_files: bool = True
     out_format: OutputFormat = "txt"
+    #: Stop the whole run after this many emitted records (0 = no cap).
+    max_results: int = 0
     concurrency: int = 6
     rps: float = 0.0
     http: HttpConfig = field(default_factory=HttpConfig)

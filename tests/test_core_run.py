@@ -5,6 +5,9 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import subprocess
+import sys
 
 import httpx
 import pytest
@@ -104,4 +107,152 @@ def test_failing_domain_is_reported_not_raised(tmp_path):
 
     assert not result.ok
     assert result.errors[0][0] == "example.com"
-    assert result.stats == []
+    # The domain still reports what it produced before dying -- here nothing,
+    # but the entry has to exist and be flagged incomplete.
+    assert [(s.domain, s.kept, s.complete) for s in result.stats] == [("example.com", 0, False)]
+
+
+PAGED = {
+    1: "http://example.com/a.php?id=1\nhttp://example.com/b.php?id=2\nRESUME1\n",
+    2: "http://example.com/c.php?id=3\n",
+}
+
+
+def _run_paged(cfg, second_page, on_record=None):
+    """Two CDX pages, where the caller decides what the second one does."""
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "resumeKey" not in dict(request.url.params):
+            return httpx.Response(200, text=PAGED[1])
+        calls["n"] += 1
+        return second_page(request)
+
+    transport = httpx.MockTransport(handler)
+    real_client = httpx.AsyncClient
+    core.httpx.AsyncClient = lambda **kw: real_client(transport=transport, **kw)  # type: ignore[assignment]
+    try:
+        return asyncio.run(core.run(cfg, on_record=on_record))
+    finally:
+        core.httpx.AsyncClient = real_client  # type: ignore[assignment]
+
+
+def test_a_domain_that_dies_midway_keeps_the_stats_it_earned(tmp_path):
+    """Failing on page 2 must not throw away what page 1 already produced."""
+    result = _run_paged(
+        _cfg(tmp_path, write_files=False),
+        lambda request: httpx.Response(500, text="boom"),
+    )
+
+    assert not result.ok
+    assert result.errors[0][0] == "example.com"
+    (st,) = result.stats
+    assert (st.fetched, st.kept, st.complete) == (2, 2, False)
+
+
+def test_a_completed_domain_is_marked_complete(tmp_path):
+    result = _run_paged(
+        _cfg(tmp_path, write_files=False),
+        lambda request: httpx.Response(200, text=PAGED[2]),
+    )
+    assert result.ok
+    (st,) = result.stats
+    assert (st.fetched, st.kept, st.complete) == (3, 3, True)
+
+
+def test_max_results_caps_the_whole_run(tmp_path):
+    seen = []
+    result = _run(_cfg(tmp_path, write_files=False, max_results=1), on_record=seen.append)
+
+    assert len(seen) == 1
+    assert result.ok  # a budget stop is not an error
+    (st,) = result.stats
+    assert st.kept == 1
+    assert st.complete is False
+
+
+def test_max_results_is_shared_across_domains(tmp_path):
+    seen = []
+    cfg = _cfg(tmp_path, domains=["a.example", "b.example"], write_files=False, max_results=3)
+    _run(cfg, on_record=seen.append)
+    # Two URLs survive per domain, so an unbounded run would emit four.
+    assert len(seen) == 3
+
+
+def test_zero_max_results_means_unlimited(tmp_path):
+    seen = []
+    _run(_cfg(tmp_path, write_files=False, max_results=0), on_record=seen.append)
+    assert len(seen) == 2
+
+
+def test_progress_is_reported_while_a_domain_runs(tmp_path, monkeypatch):
+    # One update per row, so a five-row page is observable in a unit test.
+    monkeypatch.setattr(core, "_PROGRESS_EVERY", 1)
+    seen = []
+
+    transport = httpx.MockTransport(lambda request: httpx.Response(200, text=PAGE))
+    real_client = httpx.AsyncClient
+    core.httpx.AsyncClient = lambda **kw: real_client(transport=transport, **kw)  # type: ignore[assignment]
+    try:
+        asyncio.run(
+            core.run(
+                _cfg(tmp_path, write_files=False),
+                on_progress=lambda d, f, k: seen.append((d, f, k)),
+            )
+        )
+    finally:
+        core.httpx.AsyncClient = real_client  # type: ignore[assignment]
+
+    assert [f for _, f, _ in seen] == [1, 2, 3, 4, 5]
+    assert {d for d, _, _ in seen} == {"example.com"}
+
+
+# ---- the dedup fingerprint -----------------------------------------------
+
+
+def test_fingerprint_is_stable_across_processes():
+    """Deliberately not the built-in hash(), which is randomised per process.
+
+    A fingerprint that changes between runs would quietly rule out ever
+    persisting or comparing these, so pin the actual value.
+    """
+    assert core.fingerprint("https://example.com/a.php?id=FUZZ") == int.from_bytes(
+        hashlib.blake2b(b"https://example.com/a.php?id=FUZZ", digest_size=16).digest(),
+        "big",
+    )
+    # Same input, same answer -- in a subprocess, where hash() would differ.
+    # sys.path is handed over explicitly rather than relying on PYTHONPATH
+    # being inherited: the Debian build runs this suite in a sandbox.
+    code = (
+        f"import sys; sys.path[:0] = {sys.path!r}\n"
+        "from wayparam.core import fingerprint; print(fingerprint('x'))"
+    )
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    assert out.returncode == 0, out.stderr
+    assert int(out.stdout) == core.fingerprint("x")
+
+
+def test_fingerprint_is_128_bits_wide():
+    """Narrower would make a collision -- a silently dropped URL -- thinkable."""
+    assert core.fingerprint("https://example.com/?a=FUZZ") < 2**128
+    widths = {core.fingerprint(f"https://example.com/{i}?a=FUZZ").bit_length() for i in range(200)}
+    assert max(widths) > 120  # not accidentally truncated to 64
+
+
+def test_distinct_urls_get_distinct_fingerprints():
+    urls = [f"https://example.com/{i}/p.php?id=FUZZ&n={i}" for i in range(5000)]
+    assert len({core.fingerprint(u) for u in urls}) == len(urls)
+
+
+def test_dedup_survives_urls_that_are_not_ascii(tmp_path):
+    """The digest is taken over UTF-8 bytes, so non-ASCII must not raise."""
+    page = "\n".join(
+        [
+            "https://example.com/caffè?q=1",
+            "https://example.com/caffè?q=2",  # same canonical form
+            "https://example.com/日本?q=3",
+        ]
+    )
+    seen = []
+    _run(_cfg(tmp_path, write_files=False), page=page, on_record=seen.append)
+    assert len(seen) == 2
