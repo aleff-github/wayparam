@@ -148,14 +148,15 @@ async def _process_domain(
         open_outfile(_outfile_for(cfg.outdir, domain, cfg.out_format)) if cfg.write_files else None
     )
 
+    urls = iter_original_urls(
+        domain,
+        client=client,
+        http_config=cfg.http,
+        rate_limiter=rate_limiter,
+        opt=cfg.cdx,
+    )
     try:
-        async for raw in iter_original_urls(
-            domain,
-            client=client,
-            http_config=cfg.http,
-            rate_limiter=rate_limiter,
-            opt=cfg.cdx,
-        ):
+        async for raw in urls:
             fetched += 1
             if on_progress and fetched % _PROGRESS_EVERY == 0:
                 on_progress(domain, fetched, kept)
@@ -198,6 +199,15 @@ async def _process_domain(
         complete = False
         error = exc
     finally:
+        # Every early exit -- the budget, a closed pipe -- leaves this
+        # generator suspended mid-stream. Left alone it would be finalised at
+        # loop shutdown, by which point the HTTP client it streams from is
+        # already closed, and the teardown fails noisily. Close it here, while
+        # the client is still alive.
+        try:
+            await urls.aclose()
+        except Exception:  # noqa: BLE001 - never mask why we are unwinding
+            log.debug("closing the CDX iterator failed", exc_info=True)
         if out_fh:
             out_fh.close()
 

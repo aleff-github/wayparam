@@ -256,3 +256,54 @@ def test_dedup_survives_urls_that_are_not_ascii(tmp_path):
     seen = []
     _run(_cfg(tmp_path, write_files=False), page=page, on_record=seen.append)
     assert len(seen) == 2
+
+
+def test_the_cdx_iterator_is_closed_while_the_client_is_still_open(tmp_path, monkeypatch):
+    """Regression: an early exit left the generator suspended.
+
+    It was then finalised at event-loop shutdown -- by which point the httpx
+    client it streams from had already been closed -- and the teardown failed
+    with 'aclose(): asynchronous generator is already running'. Only a real
+    connection pool shows the symptom, so pin the invariant instead: the
+    iterator must be closed while the client is still usable.
+    """
+    state: dict[str, bool] = {}
+
+    async def fake_iter(domain, *, client, http_config, rate_limiter, opt):
+        try:
+            for i in range(100):
+                yield f"https://example.com/p{i}?a=1"
+        finally:
+            state["client_still_open"] = not client.is_closed
+
+    monkeypatch.setattr(core, "iter_original_urls", fake_iter)
+
+    seen = []
+    # The budget stops the walk long before the iterator runs out.
+    result = _run(_cfg(tmp_path, write_files=False, max_results=2), on_record=seen.append)
+
+    assert len(seen) == 2
+    assert result.stats[0].complete is False
+    assert state["client_still_open"] is True
+
+
+def test_the_cdx_iterator_is_closed_when_the_consumer_goes_away(tmp_path, monkeypatch):
+    """The same has to hold when a closed pipe unwinds the run."""
+    state: dict[str, bool] = {}
+
+    async def fake_iter(domain, *, client, http_config, rate_limiter, opt):
+        try:
+            for i in range(100):
+                yield f"https://example.com/p{i}?a=1"
+        finally:
+            state["client_still_open"] = not client.is_closed
+
+    monkeypatch.setattr(core, "iter_original_urls", fake_iter)
+
+    def boom(_rec):
+        raise BrokenPipeError(32, "Broken pipe")
+
+    with pytest.raises(BrokenPipeError):
+        _run(_cfg(tmp_path, write_files=False), on_record=boom)
+
+    assert state["client_still_open"] is True

@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import logging
 import re
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator
 from dataclasses import dataclass
 
 import httpx
@@ -223,7 +223,9 @@ async def iter_original_urls(
     http_config: HttpConfig,
     rate_limiter: RateLimiter | None,
     opt: CdxOptions,
-) -> AsyncIterator[str]:
+    # AsyncGenerator, not AsyncIterator: callers close this explicitly when they
+    # stop early, and only a generator offers aclose().
+) -> AsyncGenerator[str, None]:
     mode = opt.pagination if opt.pagination in PAGINATION_MODES else "auto"
 
     if mode == "auto":
