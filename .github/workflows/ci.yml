@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  test:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,7 +16,44 @@ jobs:
         run: |
           python -m pip install -U pip
           pip install -e '.[dev]'
-      - name: Lint
+      - name: Ruff (lint)
         run: ruff check .
+      - name: Ruff (format)
+        run: ruff format --check .
+      - name: Mypy
+        run: mypy src/wayparam
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # pyproject declares requires-python = ">=3.9"; prove it on every one.
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13', '3.14']
+    name: Tests (Python ${{ matrix.python-version }})
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: |
+          python -m pip install -U pip
+          pip install -e '.[dev]'
       - name: Tests
         run: pytest -q
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install
+        run: |
+          python -m pip install -U pip
+          pip install -e '.[dev]'
+      - name: Tests with coverage
+        # The floor only ratchets upwards; raise it when coverage improves.
+        run: pytest -q --cov=wayparam --cov-report=term-missing --cov-fail-under=88

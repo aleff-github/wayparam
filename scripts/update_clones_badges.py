@@ -7,6 +7,7 @@ from datetime import datetime
 
 API_VERSION = "2022-11-28"
 
+
 def gh_request(url: str, token: str) -> tuple[int, str]:
     req = urllib.request.Request(url)
     req.add_header("Accept", "application/vnd.github+json")
@@ -19,9 +20,14 @@ def gh_request(url: str, token: str) -> tuple[int, str]:
         body = e.read().decode("utf-8", errors="replace")
         return e.code, body
 
+
 def write_json(path: pathlib.Path, obj) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(obj, ensure_ascii=False, separators=(",", ":"), sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(obj, ensure_ascii=False, separators=(",", ":"), sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
 
 def main():
     repo = os.environ.get("GITHUB_REPOSITORY", "")
@@ -63,7 +69,7 @@ def main():
             history[ts] = {"count": int(p.get("count", 0)), "uniques": int(p.get("uniques", 0))}
 
     total_tracked = sum(v.get("count", 0) for v in history.values())
-    
+
     badge_total = {
         "schemaVersion": 1,
         "label": "clones (tracked)",
@@ -74,7 +80,10 @@ def main():
     write_json(out_dir / "clones-total.json", badge_total)
 
     # Log utile
-    print(f"Updated: 14d={count_14d} uniques={uniques_14d} total_tracked={total_tracked} points={len(points)} at {datetime.utcnow().isoformat()}Z")
+    print(
+        f"Updated: 14d={count_14d} uniques={uniques_14d} total_tracked={total_tracked} points={len(points)} at {datetime.utcnow().isoformat()}Z"
+    )
+
 
 if __name__ == "__main__":
     main()

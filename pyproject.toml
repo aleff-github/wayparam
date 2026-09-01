@@ -28,7 +28,9 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "pytest>=8.0.0",
+  "pytest-cov>=5.0.0",
   "ruff>=0.6.0",
+  "mypy>=1.11.0",
 ]
 
 [project.scripts]
@@ -45,3 +47,12 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "wayparam.gui" = ["*.html"]
+
+[tool.mypy]
+# The package supports 3.9, but mypy 1.x refuses to target anything below
+# 3.10. Everything here uses `from __future__ import annotations`, and the CI
+# test matrix is what actually proves the 3.9 floor.
+python_version = "3.10"
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
