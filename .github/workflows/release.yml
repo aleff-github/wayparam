@@ -50,6 +50,10 @@ jobs:
   snap:
     name: Build and publish snap
     runs-on: ubuntu-latest
+    outputs:
+      # 'success' when the store was actually pushed to, 'skipped' when the
+      # credentials were missing. The verify job needs to tell those apart.
+      publish: ${{ steps.publish.outcome }}
     env:
       # Mirrored into the environment so the publish step can test for it:
       # `secrets` is not available in a step-level `if`.
@@ -63,14 +67,43 @@ jobs:
           sudo snap install --dangerous "${{ steps.build.outputs.snap }}"
           wayparam --help
       - uses: snapcore/action-publish@v1
+        id: publish
         # Skip rather than fail when the store credentials are not set up yet;
-        # the build and smoke test above still gate the tag.
+        # the build and smoke test above still gate the tag. The step after
+        # this one makes sure a skip is never silent.
         if: startsWith(github.ref, 'refs/tags/') && env.SNAP_CREDS != ''
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         with:
           snap: ${{ steps.build.outputs.snap }}
           release: stable
+
+      - name: Say so, loudly, when the snap was not published
+        # 0.4.0 shipped with the store still serving 0.3.1 because this step
+        # did not exist: the publish was skipped and nothing said a word.
+        if: startsWith(github.ref, 'refs/tags/') && env.SNAP_CREDS == ''
+        run: |
+          echo "::warning title=Snap not published::\
+          SNAPCRAFT_STORE_CREDENTIALS is not set, so ${GITHUB_REF_NAME} was built \
+          and smoke-tested but NOT pushed to the Snap Store. Users running \
+          'snap install wayparam' will keep getting the previous release."
+          {
+            echo "### :warning: Snap not published"
+            echo
+            echo "\`${GITHUB_REF_NAME}\` was built and smoke-tested, but the Snap Store"
+            echo "still serves the previous release, because the repository secret"
+            echo "\`SNAPCRAFT_STORE_CREDENTIALS\` is not set."
+            echo
+            echo "To fix it, from a terminal with a TTY:"
+            echo
+            echo '```'
+            echo "snapcraft export-login --snaps wayparam \\"
+            echo "  --acls package_access,package_push,package_update,package_release \\"
+            echo "  - | gh secret set SNAPCRAFT_STORE_CREDENTIALS --repo ${GITHUB_REPOSITORY}"
+            echo '```'
+            echo
+            echo "then re-run this workflow. Re-tagging is not necessary."
+          } >> "$GITHUB_STEP_SUMMARY"
 
   deb:
     name: Build .deb
@@ -127,3 +160,97 @@ jobs:
           gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 \
             || gh release create "${GITHUB_REF_NAME}" --generate-notes --verify-tag
           gh release upload "${GITHUB_REF_NAME}" dist-deb/*.deb --clobber
+
+  verify:
+    name: Verify what users can actually install
+    needs: [pypi, snap, deb]
+    # always(): the pypi job is skipped on a manual dispatch, and a skipped
+    # dependency would otherwise skip this too.
+    if: always() && startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Compare the tag against every published channel
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PYPI_RESULT: ${{ needs.pypi.result }}
+          SNAP_PUBLISH: ${{ needs.snap.outputs.publish }}
+        run: |
+          set -uo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          echo "Release under test: $version"
+          failed=0
+          rows=""
+
+          note() { rows="${rows}| $1 | $2 | $3 |"$'\n'; }
+
+          # ---- PyPI --------------------------------------------------------
+          if [ "$PYPI_RESULT" = "success" ]; then
+            got="missing"
+            for _ in $(seq 12); do
+              if curl -sfS -o /dev/null "https://pypi.org/pypi/wayparam/$version/json?cb=$RANDOM"; then
+                got="$version"; break
+              fi
+              sleep 10
+            done
+            if [ "$got" = "$version" ]; then
+              note "PyPI" "$version" ":white_check_mark:"
+            else
+              echo "::error title=PyPI::$version is not on PyPI after the publish job reported success."
+              note "PyPI" "not published" ":x:"
+              failed=1
+            fi
+          else
+            note "PyPI" "job $PYPI_RESULT" ":heavy_minus_sign:"
+          fi
+
+          # ---- Snap Store --------------------------------------------------
+          store_version() {
+            curl -sfS -H 'Snap-Device-Series: 16' \
+              "https://api.snapcraft.io/v2/snaps/info/wayparam?cb=$RANDOM" \
+              | jq -r '[."channel-map"[] | select(.channel.name == "stable") | .version] | first // "none"'
+          }
+          if [ "$SNAP_PUBLISH" = "success" ]; then
+            got="$(store_version)"
+            for _ in $(seq 12); do
+              [ "$got" = "$version" ] && break
+              sleep 10
+              got="$(store_version)"
+            done
+            if [ "$got" = "$version" ]; then
+              note "Snap Store (stable)" "$version" ":white_check_mark:"
+            else
+              echo "::error title=Snap Store::stable still serves '$got', not $version, after publishing."
+              note "Snap Store (stable)" "$got" ":x:"
+              failed=1
+            fi
+          else
+            # Deliberately not a failure: the workflow is written to tolerate a
+            # repository with no store credentials. It must not be silent, though.
+            got="$(store_version)"
+            echo "::warning title=Snap Store not updated::stable still serves '$got'. Publishing was $SNAP_PUBLISH."
+            note "Snap Store (stable)" "$got (publish $SNAP_PUBLISH)" ":warning:"
+          fi
+
+          # ---- GitHub Release assets ---------------------------------------
+          assets="$(gh release view "$GITHUB_REF_NAME" --json assets -q '[.assets[].name] | join(" ")' 2>/dev/null || echo "")"
+          if echo "$assets" | grep -q "wayparam_${version}-1_all.deb" \
+             && echo "$assets" | grep -q "wayparam-gui_${version}-1_all.deb"; then
+            note "GitHub Release (.deb)" "both packages attached" ":white_check_mark:"
+          else
+            echo "::error title=GitHub Release::expected both .deb assets, found: ${assets:-none}"
+            note "GitHub Release (.deb)" "${assets:-none}" ":x:"
+            failed=1
+          fi
+
+          # ---- summary -----------------------------------------------------
+          {
+            echo "## What users can install after $GITHUB_REF_NAME"
+            echo
+            echo "| Channel | Serving | |"
+            echo "|---|---|---|"
+            printf '%s' "$rows"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          exit "$failed"
