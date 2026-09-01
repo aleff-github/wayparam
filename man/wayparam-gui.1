@@ -1,0 +1,76 @@
+.TH WAYPARAM-GUI 1 "September 2026" "wayparam 0.4.0" "User Commands"
+.SH NAME
+wayparam\-gui \- local web interface for wayparam
+.SH SYNOPSIS
+.B wayparam\-gui
+[\fIOPTIONS\fR]
+.SH DESCRIPTION
+.B wayparam\-gui
+serves a small web interface for
+.BR wayparam (1)
+and streams results to the browser as they are found.
+.PP
+On startup it prints a URL containing a one\-time token to standard error and
+opens it in a browser:
+.PP
+.RS
+wayparam UI: http://127.0.0.1:8765/?t=<token>
+.RE
+.PP
+The interface performs outbound requests to the Internet Archive on behalf of
+whoever can reach it, so it is deliberately not reachable from the network. It
+binds to the loopback interface only, requires the token on every request, and
+rejects requests whose
+.B Host
+header is not the address it is listening on, which defends against DNS
+rebinding. Binding to any other address is refused.
+.PP
+To use it from another machine, forward the port instead:
+.PP
+.RS
+ssh \-L 8765:127.0.0.1:8765 user@host
+.RE
+.PP
+Inside a strictly confined snap, open the printed URL yourself: a confined snap
+cannot launch the host browser.
+.SH OPTIONS
+.TP
+.BR \-\-host " " \fIADDRESS\fR
+Bind address (default: 127.0.0.1). Only
+.IR 127.0.0.1 ,
+.I ::1
+and
+.I localhost
+are accepted; anything else is refused with exit status 2.
+.TP
+.BR \-\-port " " \fIN\fR
+Bind port (default: 8765). Use
+.I 0
+to let the system pick a free one; the port actually chosen appears in the
+printed URL.
+.TP
+.BR \-\-no\-browser
+Do not try to open a browser. The URL is printed to standard error either way.
+.TP
+.BR \-v ", " \-\-verbose
+Increase log verbosity. Repeat for debug output.
+.TP
+.BR \-\-version
+Print the version and exit.
+.SH EXIT STATUS
+.TP
+.B 0
+The server was stopped normally.
+.TP
+.B 1
+The address and port could not be listened on.
+.TP
+.B 2
+A bind address outside the loopback interface was requested.
+.TP
+.B 130
+Interrupted with Ctrl\-C.
+.SH SEE ALSO
+.BR wayparam (1)
+.SH AUTHOR
+Alessandro Greco (aleff\-github)

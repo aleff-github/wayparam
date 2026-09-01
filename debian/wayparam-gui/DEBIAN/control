@@ -1,0 +1,22 @@
+Package: wayparam-gui
+Source: wayparam
+Version: 0.4.0-1
+Architecture: all
+Maintainer: Aleff <alessandro.greco.1@protonmail.com>
+Installed-Size: 53
+Depends: wayparam (= 0.4.0-1), python3:any
+Section: net
+Priority: optional
+Homepage: https://github.com/aleff-github/wayparam
+Description: local web interface for wayparam
+ wayparam collects historical URLs with query parameters from the Internet
+ Archive Wayback CDX API. This package adds wayparam-gui, which serves a small
+ web interface on the loopback interface and streams results to the browser as
+ they are found.
+ .
+ The interface binds to 127.0.0.1 only, requires a per-process random token on
+ every request and rejects unexpected Host headers, because it performs
+ outbound requests on behalf of whoever can reach it.
+ .
+ Install this package only if you want the interface: the wayparam command
+ itself has no use for it.

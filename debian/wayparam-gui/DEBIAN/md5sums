@@ -1,0 +1,9 @@
+0e761476c670353e72e27940f512a071  usr/bin/wayparam-gui
+7beeacf382b40ebcbb4ad99a8e5a1f12  usr/lib/python3/dist-packages/wayparam/gui/__init__.py
+0a5eb837a18df1ecb1e118bb699cd608  usr/lib/python3/dist-packages/wayparam/gui/index.html
+366d5248b9c54a6c6f578f71192c4151  usr/lib/python3/dist-packages/wayparam/gui/server.py
+8fd02b2713d3c98985ed43bd3cbc8aa8  usr/share/doc/wayparam-gui/README.md.gz
+caad402ff06630d7b13fd0be3f7afc84  usr/share/doc/wayparam-gui/changelog.Debian.gz
+1336a244c53bf88ffb7ef1191de3ca30  usr/share/doc/wayparam-gui/changelog.gz
+56781f57aac3c5fa9f8e6b25cb40ea7c  usr/share/doc/wayparam-gui/copyright
+1472ee68a2cb129b6e7ec8ce56c8b291  usr/share/man/man1/wayparam-gui.1.gz

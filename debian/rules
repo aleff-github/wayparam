@@ -15,6 +15,11 @@ export PYBUILD_DESTDIR=debian/wayparam
 # dist-packages path is interpreter-versioned at this point, so the directory
 # is located rather than hardcoded, and the whole tree is dumped if anything
 # is not where it should be.
+# Installed as the upstream changelog rather than shipped as a doc file,
+# which is what lintian's wrong-name-for-upstream-changelog asks for.
+override_dh_installchangelogs:
+	dh_installchangelogs CHANGELOG.md
+
 override_dh_install:
 	dh_install
 	set -e; \
