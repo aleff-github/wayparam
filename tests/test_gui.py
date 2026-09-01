@@ -14,7 +14,9 @@ from pathlib import Path
 
 import pytest
 
-from wayparam.gui.server import Rejected, config_from_request, serve
+from wayparam.core import DomainStats, RunResult
+from wayparam.gui.server import Rejected, config_from_request, is_client_gone, serve
+from wayparam.output import UrlRecord
 
 # ---- request translation -------------------------------------------------
 
@@ -127,3 +129,146 @@ def test_each_process_gets_a_distinct_token():
     finally:
         a.shutdown()
         b.shutdown()
+
+
+def test_float_fields_survive_garbage():
+    cfg = config_from_request({"domains": "example.com", "rps": "abc", "timeout": "soon"})
+    assert cfg.rps == 0.0
+    assert cfg.http.timeout_s == 30.0
+
+    cfg = config_from_request({"domains": "example.com", "rps": 2.5, "timeout": 5})
+    assert cfg.rps == 2.5
+    assert cfg.http.timeout_s == 5.0
+
+
+def test_float_fields_are_clamped():
+    cfg = config_from_request({"domains": "example.com", "rps": -3, "timeout": 99999})
+    assert cfg.rps == 0.0
+    assert cfg.http.timeout_s == 600.0
+
+
+def _post(port: int, token: str, body: bytes) -> tuple[int, bytes]:
+    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+    try:
+        conn.request(
+            "POST",
+            "/api/run",
+            body=body,
+            headers={"X-Wayparam-Token": token, "Content-Type": "application/json"},
+        )
+        resp = conn.getresponse()
+        return resp.status, resp.read()
+    finally:
+        conn.close()
+
+
+def test_a_non_object_body_is_rejected_with_an_answer(server):
+    """A malformed body must produce a JSON error, not a dropped connection."""
+    port, token = server
+    status, body = _post(port, token, b'["not", "an", "object"]')
+    assert status == 400
+    assert "JSON object" in json.loads(body)["error"]
+
+
+# ---- the streamed run ----------------------------------------------------
+
+
+def _fake_run(records, stats, errors=(), fail=None):
+    """Stand in for core.run so the streaming path can be tested offline."""
+
+    async def fake(cfg, *, on_record=None, on_progress=None):
+        if fail is not None:
+            raise fail
+        for url in records:
+            if on_record:
+                on_record(UrlRecord(domain=cfg.domains[0], url=url))
+        return RunResult(stats=list(stats), errors=list(errors))
+
+    return fake
+
+
+def _stream(port: int, token: str, body: dict) -> list[dict]:
+    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+    try:
+        conn.request(
+            "POST",
+            "/api/run",
+            body=json.dumps(body).encode(),
+            headers={"X-Wayparam-Token": token, "Content-Type": "application/json"},
+        )
+        resp = conn.getresponse()
+        assert resp.status == 200
+        raw = resp.read().decode("utf-8")
+    finally:
+        conn.close()
+    return [json.loads(line) for line in raw.splitlines() if line.strip()]
+
+
+def test_a_run_streams_ndjson_events(server, monkeypatch):
+    port, token = server
+    monkeypatch.setattr(
+        "wayparam.gui.server.run",
+        _fake_run(
+            ["https://example.com/?a=FUZZ", "https://example.com/?b=FUZZ"],
+            [DomainStats(domain="example.com", fetched=9, kept=2)],
+        ),
+    )
+
+    events = _stream(port, token, {"domains": "example.com"})
+
+    assert [e["type"] for e in events] == ["start", "url", "url", "stats", "done"]
+    assert events[0]["domains"] == ["example.com"]
+    assert [e["url"] for e in events if e["type"] == "url"] == [
+        "https://example.com/?a=FUZZ",
+        "https://example.com/?b=FUZZ",
+    ]
+    assert events[3] == {
+        "type": "stats",
+        "domain": "example.com",
+        "fetched": 9,
+        "kept": 2,
+        "complete": True,
+    }
+
+
+def test_partial_stats_are_streamed_as_incomplete(server, monkeypatch):
+    port, token = server
+    monkeypatch.setattr(
+        "wayparam.gui.server.run",
+        _fake_run(
+            ["https://example.com/?a=FUZZ"],
+            [DomainStats(domain="example.com", fetched=4, kept=1, complete=False)],
+            errors=[("example.com", RuntimeError("CDX went away"))],
+        ),
+    )
+
+    events = _stream(port, token, {"domains": "example.com"})
+    stats = next(e for e in events if e["type"] == "stats")
+    error = next(e for e in events if e["type"] == "error")
+
+    assert stats["complete"] is False
+    assert stats["kept"] == 1
+    assert "CDX went away" in error["message"]
+    assert events[-1]["type"] == "done"
+
+
+def test_a_failing_run_still_terminates_the_stream(server, monkeypatch):
+    """An unexpected failure must reach the page, not hang the response."""
+    port, token = server
+    monkeypatch.setattr(
+        "wayparam.gui.server.run", _fake_run([], [], fail=RuntimeError("engine exploded"))
+    )
+
+    events = _stream(port, token, {"domains": "example.com"})
+    assert events[0]["type"] == "start"
+    assert events[-1]["type"] == "error"
+    assert "engine exploded" in events[-1]["message"]
+
+
+def test_client_disconnects_are_not_treated_as_crashes():
+    """A closed tab is routine traffic, not a fault to dump a traceback for."""
+    assert is_client_gone(ConnectionResetError(104, "Connection reset by peer"))
+    assert is_client_gone(BrokenPipeError(32, "Broken pipe"))
+    assert is_client_gone(TimeoutError())
+    assert not is_client_gone(RuntimeError("a real bug"))
+    assert not is_client_gone(None)

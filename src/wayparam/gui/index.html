@@ -172,7 +172,9 @@
   function handle(ev) {
     if (ev.type === "url") addUrl(ev.url);
     else if (ev.type === "start") msg("Searching " + ev.domains.join(", ") + " …");
-    else if (ev.type === "stats") msg(`${ev.domain}: fetched=${ev.fetched} kept=${ev.kept}`, "ok");
+    else if (ev.type === "stats") msg(
+      `${ev.domain}: fetched=${ev.fetched} kept=${ev.kept}` + (ev.complete === false ? " (incomplete)" : ""),
+      ev.complete === false ? "err" : "ok");
     else if (ev.type === "error") msg((ev.domain ? ev.domain + ": " : "") + ev.message, "err");
     else if (ev.type === "done") msg("Done.", "ok");
   }

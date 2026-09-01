@@ -19,6 +19,7 @@ import http.server
 import json
 import logging
 import secrets
+import sys
 import threading
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
@@ -70,15 +71,24 @@ def config_from_request(data: dict) -> RunConfig:
         except (TypeError, ValueError):
             return default
 
+    def _float(key: str, default: float, lo: float, hi: float) -> float:
+        raw = data.get(key)
+        if raw is None or raw == "":
+            return default
+        try:
+            return max(lo, min(hi, float(raw)))
+        except (TypeError, ValueError):
+            return default
+
     return RunConfig(
         domains=domains,
         outdir=Path(outdir) if write_files else Path("results"),
         write_files=write_files,
         out_format="jsonl" if data.get("format") == "jsonl" else "txt",
         concurrency=_int("concurrency", 6, 1, 64),
-        rps=max(0.0, float(data.get("rps") or 0.0)),
+        rps=_float("rps", 0.0, 0.0, 1000.0),
         http=HttpConfig(
-            timeout_s=float(data.get("timeout") or 30.0),
+            timeout_s=_float("timeout", 30.0, 1.0, 600.0),
             retries=_int("retries", 4, 0, 10),
             proxy=(str(data.get("proxy") or "").strip() or None),
         ),
@@ -132,9 +142,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if length <= 0 or length > MAX_BODY_BYTES:
             raise Rejected(413, "Request body missing or too large.")
         try:
-            return json.loads(self.rfile.read(length).decode("utf-8"))
+            data = json.loads(self.rfile.read(length).decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError):
             raise Rejected(400, "Body is not valid JSON.") from None
+        if not isinstance(data, dict):
+            raise Rejected(400, "Body must be a JSON object.")
+        return data
 
     # ---- responses ----------------------------------------------------
 
@@ -174,7 +187,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             path = urlsplit(self.path)
             if path.path != "/":
                 raise Rejected(404, "Not found.")
-            self._check_token((parse_qs(path.query).get("t") or [None])[0])
+            supplied = parse_qs(path.query).get("t", [""])[0]
+            self._check_token(supplied or None)
             self._send(200, _INDEX.read_bytes(), "text/html; charset=utf-8")
         except Rejected as e:
             self._send_error_json(e)
@@ -188,6 +202,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             cfg = config_from_request(self._read_json())
         except Rejected as e:
             self._send_error_json(e)
+            return
+        except Exception:  # noqa: BLE001 - answer, never drop the connection
+            log.exception("could not build a run from the request")
+            self._send_error_json(Rejected(400, "Could not build a run from that request."))
             return
 
         self._stream_run(cfg)
@@ -217,7 +235,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
             chunk({"type": "start", "domains": cfg.domains})
             result = asyncio.run(run(cfg, on_record=on_record))
             for st in result.stats:
-                chunk({"type": "stats", "domain": st.domain, "fetched": st.fetched, "kept": st.kept})
+                chunk(
+                    {
+                        "type": "stats",
+                        "domain": st.domain,
+                        "fetched": st.fetched,
+                        "kept": st.kept,
+                        "complete": st.complete,
+                    }
+                )
             for domain, exc in result.errors:
                 chunk({"type": "error", "domain": domain, "message": str(exc)})
             chunk({"type": "done"})
@@ -225,6 +251,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.wfile.flush()
         except (BrokenPipeError, ConnectionResetError):
             log.info("client disconnected; run cancelled")
+            # Do not go back for another request on a socket the client has
+            # already dropped: reading it would raise again, out of our hands.
+            self.close_connection = True
         except Exception as exc:  # noqa: BLE001 - surface any failure to the page
             log.exception("run failed")
             try:
@@ -232,6 +261,28 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self.wfile.write(b"0\r\n\r\n")
             except OSError:
                 pass
+
+
+def is_client_gone(exc: BaseException | None) -> bool:
+    """Was this the viewer closing the tab rather than a fault worth reporting?"""
+    return isinstance(exc, (BrokenPipeError, ConnectionResetError, TimeoutError))
+
+
+class Server(http.server.ThreadingHTTPServer):
+    daemon_threads = True
+
+    def handle_error(self, request, client_address) -> None:
+        """Keep normal disconnects out of the terminal.
+
+        A browser that navigates away, or a `curl | head` that stops reading,
+        resets the connection. socketserver's default is to dump a traceback
+        for it, which makes routine traffic look like a crash.
+        """
+        exc = sys.exc_info()[1]
+        if is_client_gone(exc):
+            log.debug("client %s went away: %s", client_address, exc)
+            return
+        super().handle_error(request, client_address)
 
 
 def serve(host: str = "127.0.0.1", port: int = 8765) -> tuple[http.server.ThreadingHTTPServer, str]:
@@ -243,8 +294,7 @@ def serve(host: str = "127.0.0.1", port: int = 8765) -> tuple[http.server.Thread
 
     Bound.token = token
 
-    httpd = http.server.ThreadingHTTPServer((host, port), Bound)
-    httpd.daemon_threads = True
+    httpd = Server((host, port), Bound)
     bound_port = httpd.server_address[1]
     Bound.allowed_hosts = frozenset(
         {f"{host}:{bound_port}", f"localhost:{bound_port}", f"127.0.0.1:{bound_port}"}
