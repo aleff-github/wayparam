@@ -2,6 +2,7 @@
 
 [![wayparam on the Snap Store](https://snapcraft.io/wayparam/badge.svg)](https://snapcraft.io/wayparam)
 [![PyPI](https://img.shields.io/pypi/v/wayparam?color=A81D33)](https://pypi.org/project/wayparam/)
+[![BlackArch](https://img.shields.io/badge/BlackArch-available-1793D1?logo=archlinux&logoColor=white)](https://github.com/BlackArch/blackarch/tree/master/packages/wayparam)
 
 **wayparam** is a modern, cross-platform CLI tool to **fetch historical URLs from the Internet Archive Wayback CDX API**, filter out “boring” URLs (static assets), and **normalize query parameters** so you can focus on endpoints that actually matter.
 
@@ -45,6 +46,16 @@ http://www.example.com/?format=FUZZ&retailerId=FUZZ
 ---
 
 ## Installation
+
+### BlackArch Linux
+
+wayparam is officially available in the BlackArch Linux repository.
+
+```bash
+sudo pacman -S wayparam
+````
+
+On an existing Arch Linux installation with the BlackArch repository enabled, the same package can be installed directly with `pacman`.
 
 ### From PyPI (recommended)
 
