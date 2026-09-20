@@ -30,7 +30,10 @@ debian/.debhelper/
 debian/files
 debian/debhelper-build-stamp
 debian/wayparam/
-debian/wayparam.substvars
+debian/wayparam-gui/
+debian/tmp/
+debian/*.substvars
+debian/*.debhelper
 debian/*.log
 
 # ---------- Snap build artifacts ----------

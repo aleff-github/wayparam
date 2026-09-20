@@ -10,8 +10,10 @@ description: |
   parameters.
 
   By default, query parameter values are replaced with a placeholder (FUZZ),
-  making the output suitable for sharing and fuzzing workflows. The tool does
-  not crawl targets: it only queries the public Wayback CDX API.
+  making the output suitable for sharing and fuzzing workflows. Historical
+  analysis views can also report first/last seen, capture counts, status/MIME
+  distributions and query-parameter prevalence. The tool does not crawl
+  targets: it only queries the public Wayback CDX API.
 
   A local web interface is bundled as `wayparam.gui`. It listens on
   127.0.0.1 and prints a URL containing a one-time token; open that URL

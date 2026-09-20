@@ -67,6 +67,44 @@ jobs:
       - name: Tests
         run: pytest -q
 
+  package:
+    name: Package smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+      - name: Build Python artifacts
+        run: |
+          python -m pip install -U pip build twine
+          python -m build
+          python -m twine check dist/*
+          python -m pip install --force-reinstall dist/*.whl
+          wayparam --version
+          wayparam-gui --version
+      - name: Install Debian build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential devscripts debhelper dh-python python3-all \
+            python3-setuptools pybuild-plugin-pyproject python3-httpx python3-pytest lintian
+      - name: Build and lint Debian packages
+        run: |
+          ./scripts/build-deb.sh
+          lintian --tag-display-limit 0 ../wayparam_*.changes
+      - name: Smoke test Debian packages
+        run: |
+          sudo apt-get install -y ../wayparam_*_all.deb ../wayparam-gui_*_all.deb
+          /usr/bin/wayparam --version
+          /usr/bin/wayparam-gui --version
+          dpkg -L wayparam | grep -q /usr/bin/wayparam
+          dpkg -L wayparam-gui | grep -q /usr/bin/wayparam-gui
+          dpkg -L wayparam-gui | grep -q 'gui/index.html'
+          ! dpkg -L wayparam | grep -q 'gui/index.html'
+
   coverage:
     runs-on: ubuntu-latest
     steps:

@@ -129,7 +129,7 @@ jobs:
       - name: Build package
         run: ./scripts/build-deb.sh
       - name: Lintian
-        run: lintian --tag-display-limit 0 ../wayparam_*.changes || true
+        run: lintian --tag-display-limit 0 ../wayparam_*.changes
       - name: Smoke test
         run: |
           # Installs both binary packages: the CLI and the optional web UI.

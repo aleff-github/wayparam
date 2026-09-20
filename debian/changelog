@@ -1,3 +1,18 @@
+wayparam (0.5.0-1) noble; urgency=medium
+
+  * New upstream release.
+  * Add historical endpoint intelligence with first/last seen timestamps,
+    capture counts, status-code counts and MIME-type counts.
+  * Add historical parameter prevalence and per-domain summary views.
+  * Add capture metadata support to the Wayback CDX pagination layer while
+    preserving the URL-only iterator contract.
+  * Expose historical views in the optional local web interface.
+  * Harden target parsing, IPv6 handling, numeric CLI validation and
+    cross-platform output filenames.
+  * Add Windows/macOS smoke tests and strengthen release artifact checks.
+
+ -- Aleff <alessandro.greco.1@protonmail.com>  Sun, 20 Sep 2026 22:05:20 +0200
+
 wayparam (0.4.0-1) noble; urgency=medium
 
   * New upstream release.

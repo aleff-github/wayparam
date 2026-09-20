@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.0
 - Added capture-level historical intelligence with `--history`, `--params` and `--summary`
 - Historical modes request CDX timestamp/status/MIME metadata and disable `collapse=urlkey` so first/last seen and capture counts remain meaningful
 - Added deterministic TXT/JSONL analysis output with mode-specific per-domain filenames
