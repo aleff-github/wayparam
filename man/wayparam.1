@@ -75,6 +75,25 @@ Do not write per-domain output files. Requires
 .TP
 .BR \-\-stats
 Print per-domain counts (fetched/kept) to stderr at the end.
+.TP
+.BR \-\-history
+Aggregate uncollapsed capture metadata per normalized URL. Records include first
+and last seen timestamps, capture counts, status-code counts and MIME-type
+counts. Mutually exclusive with
+.BR \-\-params
+and
+.BR \-\-summary .
+.TP
+.BR \-\-params
+Aggregate historical prevalence by query-parameter name, including endpoint
+count, represented captures and first/last seen timestamps.
+.TP
+.BR \-\-summary
+Emit one historical aggregate record per domain.
+.PP
+Historical modes automatically disable CDX collapse so capture counts and
+first/last-seen dates are meaningful. This may transfer substantially more data
+than a normal URL run.
 .SS Wayback / CDX
 .TP
 .BR \-\-include\-subdomains
@@ -119,7 +138,8 @@ to bound a run.
 .TP
 .BR \-\-max\-results " " \fIN\fR
 Stop the whole run after this many URLs. The budget is global, shared by every
-domain in the run (default: 0, no cap). A run stopped by the budget exits 0, and
+domain in the run (default: 0, no cap). In historical analysis modes the budget
+counts accepted capture rows before aggregation. A run stopped by the budget exits 0, and
 .BR \-\-stats
 marks the affected domains as incomplete.
 .SS Normalization and Filtering
@@ -207,6 +227,22 @@ Be polite to the Wayback API:
 wayparam -d example.com --rps 1 --concurrency 2
 .fi
 .RE
+.PP
+Emit historical endpoint metadata as JSONL:
+.PP
+.RS
+.nf
+wayparam -d example.com --history --stdout --no-files --format jsonl
+.fi
+.RE
+.PP
+Summarize historical parameter prevalence:
+.PP
+.RS
+.nf
+wayparam -d example.com --params
+.fi
+.RE
 .SH FILES
 .TP
 .I results/<domain>.txt
@@ -215,6 +251,15 @@ Default per-domain output file (txt format).
 .I results/<domain>.jsonl
 Per-domain output file when using
 .BR --format jsonl .
+.TP
+.I results/<domain>.history.{txt,jsonl}
+Historical endpoint analysis.
+.TP
+.I results/<domain>.params.{txt,jsonl}
+Historical parameter analysis.
+.TP
+.I results/<domain>.summary.{txt,jsonl}
+Historical domain summary.
 .SH EXIT STATUS
 .TP
 .B 0

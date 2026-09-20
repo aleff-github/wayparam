@@ -11,12 +11,15 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Literal
 
 from .filters import DEFAULT_EXT_BLACKLIST, FilterOptions, parse_ext_set
 from .http import HttpConfig
 from .normalize import NormalizeOptions
 from .output import OutputFormat
 from .wayback import CdxOptions
+
+AnalysisMode = Literal["history", "params", "summary"]
 
 
 @dataclass(frozen=True)
@@ -25,6 +28,7 @@ class RunConfig:
     outdir: Path = Path("results")
     write_files: bool = True
     out_format: OutputFormat = "txt"
+    analysis: AnalysisMode | None = None
     #: Stop the whole run after this many emitted records (0 = no cap).
     max_results: int = 0
     concurrency: int = 6

@@ -29,6 +29,7 @@ http://www.example.com/?format=FUZZ&retailerId=FUZZ
 - **Rate limiting** (`--rps`) to be polite with Wayback/CDX
 - **Retry + backoff** and clearer error messages
 - **Lossless CDX pagination** with automatic block-mode fallback
+- **Historical intelligence**: first/last seen, capture counts, status/MIME distributions, parameter prevalence
 - Filters “boring” URLs by:
   - extension blacklist/whitelist
   - optional path regex exclusion
@@ -171,6 +172,21 @@ wayparam -d example.com --include-subdomains --rps 1 --concurrency 2
 wayparam -d example.com --ext-blacklist ".png,.jpg,.css,.js" --exclude-path-regex "^/static/"
 ```
 
+### 7) Historical endpoint intelligence
+
+```bash
+wayparam -d example.com --history --stdout --no-files --format jsonl
+```
+
+### 8) Parameter history or a domain summary
+
+```bash
+wayparam -d example.com --params
+wayparam -d example.com --summary --format jsonl
+```
+
+Historical modes retrieve capture metadata and automatically disable CDX collapse so that first/last seen and capture counts are meaningful. They can therefore transfer substantially more data than a normal URL run; use `--from`, `--to`, filters or `--max-results` to bound the analysis.
+
 ---
 
 ## How it works (under the hood)
@@ -241,6 +257,14 @@ wayparam -d example.com --stdout --no-files | sort -u > urls.txt
   page boundary while `collapse` is on, so wayparam probes with one request and
   switches to the block API only when the result actually spans pages.
 * `--block-size 100` (CDX index blocks per request in block mode)
+
+### Historical analysis
+
+* `--history` — aggregate first/last seen, capture counts, status codes and MIME types per normalized URL
+* `--params` — aggregate endpoint/capture prevalence per query-parameter name
+* `--summary` — one historical summary record per domain
+
+These views are mutually exclusive. In historical modes, `--max-results` caps accepted capture rows before aggregation.
 
 ### Normalization
 

@@ -38,3 +38,28 @@ wayparam -d example.com --stdout --no-files --format jsonl | jq -r '.url'
 ```bash
 wayparam -l domains.txt --stdout --no-files --stats | sort -u > urls.txt
 ```
+
+
+## Historical output
+
+Analysis modes use separate filenames so they cannot overwrite normal URL
+results:
+
+- `results/<domain>.history.txt` / `.jsonl`
+- `results/<domain>.params.txt` / `.jsonl`
+- `results/<domain>.summary.txt` / `.jsonl`
+
+The TXT representation is tab-separated. JSONL keeps nested status-code and
+MIME-type distributions structured.
+
+Example history record:
+
+```json
+{"type":"history","domain":"example.com","url":"https://example.com/item?id=FUZZ","first_seen":"20200101000000","last_seen":"20250101000000","captures":12,"status_codes":{"200":10,"302":2},"mime_types":{"text/html":12}}
+```
+
+Example summary record:
+
+```json
+{"type":"summary","domain":"example.com","captures":2500,"accepted_captures":720,"unique_urls":180,"unique_parameters":31,"first_seen":"20120101000000","last_seen":"20260801000000","status_codes":{"200":650,"302":70},"mime_types":{"application/json":90,"text/html":630}}
+```

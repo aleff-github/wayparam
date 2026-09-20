@@ -14,9 +14,11 @@ from pathlib import Path
 
 import pytest
 
+from wayparam.analysis import DomainHistory, HistoryRunResult
 from wayparam.core import DomainStats, RunResult
 from wayparam.gui.server import Rejected, config_from_request, is_client_gone, serve
 from wayparam.output import UrlRecord
+from wayparam.wayback import CaptureRecord
 
 # ---- request translation -------------------------------------------------
 
@@ -47,6 +49,19 @@ def test_defaults_match_the_cli():
     assert cfg.normalize.only_params is True
     assert cfg.normalize.drop_tracking is True
     assert cfg.cdx.collapse == "urlkey"
+
+
+def test_analysis_mode_is_sanitized():
+    assert (
+        config_from_request({"domains": "example.com", "analysis": "history"}).analysis == "history"
+    )
+    assert (
+        config_from_request({"domains": "example.com", "analysis": "params"}).analysis == "params"
+    )
+    assert (
+        config_from_request({"domains": "example.com", "analysis": "summary"}).analysis == "summary"
+    )
+    assert config_from_request({"domains": "example.com", "analysis": "other"}).analysis is None
 
 
 def test_files_are_only_written_when_an_outdir_is_given(tmp_path: Path):
@@ -277,3 +292,35 @@ def test_client_disconnects_are_not_treated_as_crashes():
     assert is_client_gone(TimeoutError())
     assert not is_client_gone(RuntimeError("a real bug"))
     assert not is_client_gone(None)
+
+
+def test_historical_summary_is_streamed_as_analysis_event(server, monkeypatch):
+    port, token = server
+
+    async def fake_history(cfg, *, on_progress=None):
+        history = DomainHistory(domain=cfg.domains[0], fetched=1)
+        history.add(
+            "https://example.com/?id=FUZZ",
+            CaptureRecord(
+                original="https://example.com/?id=1",
+                timestamp="20240102030405",
+                status_code="200",
+                mime_type="text/html",
+            ),
+        )
+        return HistoryRunResult(
+            stats=[DomainStats(cfg.domains[0], fetched=1, kept=1)],
+            analyses={cfg.domains[0]: history},
+        )
+
+    monkeypatch.setattr("wayparam.gui.server.run_history", fake_history)
+    events = _stream(
+        port,
+        token,
+        {"domains": "example.com", "analysis": "summary", "format": "jsonl"},
+    )
+
+    assert [event["type"] for event in events] == ["start", "analysis", "stats", "done"]
+    assert events[1]["mode"] == "summary"
+    assert events[1]["record"]["type"] == "summary"
+    assert events[1]["record"]["unique_urls"] == 1

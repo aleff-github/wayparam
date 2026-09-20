@@ -13,6 +13,7 @@ Fields:
 - `outdir: Path` (default: `results`)
 - `write_files: bool` (default: `True`)
 - `out_format: "txt" | "jsonl"`
+- `analysis: "history" | "params" | "summary" | None`
 - `max_results: int` (default: `0`, meaning no cap) — global budget across the
   whole run, not per domain
 - `concurrency: int`, `rps: float`
@@ -55,6 +56,20 @@ itself. Deliberately not the built-in `hash()`, which is randomised per process.
 The global `max_results` counter shared by every domain in a run. `take()`
 claims one slot and returns False once the cap is reached.
 
+## `wayparam.analysis`
+
+### `run_history(cfg, *, on_progress=None) -> HistoryRunResult`
+Processes uncollapsed capture metadata while reusing the normal filter and normalization options. `max_results` is a global budget of accepted captures in this runner.
+
+### `DomainHistory`
+Holds normalized endpoint aggregates for one domain and derives parameter and domain-level summaries.
+
+### `records_for(history, mode) -> list[dict]`
+Produces deterministic serializable records for `history`, `params`, or `summary` output.
+
+### `format_record(record, fmt) -> str`
+Formats an analysis record as tab-separated text or compact JSONL.
+
 ## `wayparam.http`
 
 ### `HttpConfig`
@@ -92,6 +107,13 @@ Fields:
 - `match_type: str | None`
 - `pagination: str` (default: `auto`; one of `PAGINATION_MODES`)
 - `block_size: int` (default: 100) — index blocks per request in block mode
+- `metadata: bool` (default: False) — request timestamp/status/MIME with the original URL
+
+### `CaptureRecord`
+A capture row with `original`, optional `timestamp`, optional `status_code` and optional `mime_type`.
+
+### `iter_captures(domain, client, http_config, rate_limiter, opt) -> AsyncIterator[CaptureRecord]`
+Yields capture rows and uses the same pagination strategy as normal URL collection. When `opt.metadata` is true, the query requests `timestamp,statuscode,mimetype,original`.
 
 ### `iter_original_urls(domain, client, http_config, rate_limiter, opt) -> AsyncIterator[str]`
 Yields “original” URLs from the CDX API, choosing between the two pagination

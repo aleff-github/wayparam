@@ -47,6 +47,21 @@ wayparam -d example.com --stdout --no-files --format jsonl
 wayparam -d example.com --rps 1 --concurrency 2
 ```
 
+### Historical endpoint intelligence
+```bash
+wayparam -d example.com --history --stdout --no-files --format jsonl
+```
+
+### Historical parameter prevalence
+```bash
+wayparam -d example.com --params
+```
+
+### One historical summary per domain
+```bash
+wayparam -l domains.txt --summary --format jsonl
+```
+
 ## Notes about output
 
 - **stdout** is reserved for machine-readable results **only when** `--stdout` is enabled.

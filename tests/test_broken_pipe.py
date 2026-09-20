@@ -156,3 +156,63 @@ def test_exit_code_is_0_when_a_budget_stopped_the_run(monkeypatch):
 
     monkeypatch.setattr(cli, "run", capped)
     assert cli.main(ARGV + ["--max-results", "10"]) == 0
+
+
+@pytest.mark.parametrize(
+    ("flag", "mode"),
+    [
+        ("--history", "history"),
+        ("--params", "params"),
+        ("--summary", "summary"),
+    ],
+)
+def test_analysis_flags_reach_the_config(flag, mode):
+    parser = cli.build_arg_parser()
+    cfg = cli.build_config(parser.parse_args(["-d", "example.com", flag]))
+    assert cfg.analysis == mode
+
+
+def test_analysis_views_are_mutually_exclusive():
+    parser = cli.build_arg_parser()
+    with pytest.raises(SystemExit) as exc:
+        parser.parse_args(["-d", "example.com", "--history", "--summary"])
+    assert exc.value.code == 2
+
+
+def test_summary_mode_prints_structured_jsonl(monkeypatch, capsys):
+    from wayparam.analysis import DomainHistory, HistoryRunResult
+    from wayparam.core import DomainStats
+    from wayparam.wayback import CaptureRecord
+
+    async def fake_history(cfg, **_kw):
+        history = DomainHistory(domain="example.com", fetched=1)
+        history.add(
+            "https://example.com/?id=FUZZ",
+            CaptureRecord(
+                original="https://example.com/?id=1",
+                timestamp="20240102030405",
+                status_code="200",
+                mime_type="text/html",
+            ),
+        )
+        return HistoryRunResult(
+            stats=[DomainStats("example.com", fetched=1, kept=1)],
+            analyses={"example.com": history},
+        )
+
+    monkeypatch.setattr(cli, "run_history", fake_history)
+    rc = cli.main(
+        [
+            "-d",
+            "example.com",
+            "--summary",
+            "--stdout",
+            "--no-files",
+            "--format",
+            "jsonl",
+        ]
+    )
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert '"type":"summary"' in out
+    assert '"unique_urls":1' in out

@@ -74,3 +74,39 @@ wayparam -d example.com --keep-values
 ```
 
 Use only if you understand the privacy implications.
+
+
+---
+
+## Historical endpoint intelligence
+
+Group all accepted captures by normalized URL and retain first/last seen,
+capture count, status codes and MIME types:
+
+```bash
+wayparam -d example.com --history --stdout --no-files --format jsonl
+```
+
+A narrower time window can keep large archives manageable:
+
+```bash
+wayparam -d example.com --history --from 2022 --to 2026 --max-results 50000
+```
+
+## Historical parameter prevalence
+
+```bash
+wayparam -d example.com --params --stdout --no-files
+```
+
+The text view is tab-separated and reports parameter name, endpoint count,
+capture count and first/last seen timestamps.
+
+## Domain summary
+
+```bash
+wayparam -l domains.txt --summary --format jsonl
+```
+
+Historical modes automatically disable CDX collapse; expect them to retrieve
+more rows than a normal URL collection.

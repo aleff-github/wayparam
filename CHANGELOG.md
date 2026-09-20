@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- Added capture-level historical intelligence with `--history`, `--params` and `--summary`
+- Historical modes request CDX timestamp/status/MIME metadata and disable `collapse=urlkey` so first/last seen and capture counts remain meaningful
+- Added deterministic TXT/JSONL analysis output with mode-specific per-domain filenames
+- Added the same historical views to the optional local web UI
 - Added `--page-size` as the documented alias for `--limit`
 - Reject invalid negative/zero CLI numeric settings before a run starts
 - Unified domain/URL input normalization across `-d`, `-l` and the web UI
