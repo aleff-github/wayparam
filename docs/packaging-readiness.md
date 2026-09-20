@@ -120,10 +120,10 @@ mis-split would otherwise pass unnoticed.
 ### 3a. `.deb` attached to the GitHub Release (already automated)
 
 ```bash
-wget https://github.com/aleff-github/wayparam/releases/latest/download/wayparam_0.4.0-1_all.deb
-sudo apt install ./wayparam_0.4.0-1_all.deb
+wget https://github.com/aleff-github/wayparam/releases/latest/download/wayparam_0.5.0-1_all.deb
+sudo apt install ./wayparam_0.5.0-1_all.deb
 # optional, for the web interface:
-sudo apt install ./wayparam-gui_0.4.0-1_all.deb
+sudo apt install ./wayparam-gui_0.5.0-1_all.deb
 ```
 
 No infrastructure needed, but users get no automatic updates.
@@ -140,11 +140,11 @@ with updates through the normal apt upgrade path. Ubuntu only.
 
    ```bash
    ./scripts/build-deb.sh --source
-   dput ppa:<your-launchpad-user>/wayparam ../wayparam_0.4.0-1_source.changes
+   dput ppa:<your-launchpad-user>/wayparam ../wayparam_0.5.0-1_source.changes
    ```
 
 4. For extra series, rebuild with the series name changed in `debian/changelog`
-   (or use `backportpackage`) and bump the revision, e.g. `0.4.0-1~noble1`.
+   (or use `backportpackage`) and bump the revision, e.g. `0.5.0-1~noble1`.
 
 ### 3c. Debian / Kali proper
 
@@ -173,8 +173,8 @@ is likewise unavailable before bookworm/noble.
 
 ## Release checklist
 
-1. Bump the version in `pyproject.toml`, `src/wayparam/__init__.py` and
-   `man/wayparam.1`; update `CHANGELOG.md`.
+1. Bump the version in `pyproject.toml`, `src/wayparam/__init__.py`,
+   `man/wayparam.1` and `man/wayparam-gui.1`; update `CHANGELOG.md`.
 2. `dch -v <version>-1` to add a `debian/changelog` entry (the build script
    refuses to run if the two versions disagree).
 3. `ruff check . && pytest -q`.

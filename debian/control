@@ -29,9 +29,11 @@ Description: fetch and normalize parameterized URLs from the Wayback CDX API
  parameters.
  .
  By default query parameter values are replaced with a placeholder (FUZZ),
- which makes the output suitable for sharing and for fuzzing workflows. The
- tool does not crawl the target: it only queries the public Wayback CDX API,
- which makes it usable in passive OSINT and reconnaissance workflows.
+ which makes the output suitable for sharing and for fuzzing workflows.
+ Historical modes can also summarize first/last seen timestamps, capture
+ counts, status/MIME distributions and parameter prevalence. The tool does not
+ crawl the target: it only queries the public Wayback CDX API, which makes it
+ usable in passive OSINT and reconnaissance workflows.
 
 Package: wayparam-gui
 Architecture: all
@@ -45,7 +47,7 @@ Description: local web interface for wayparam
  web interface on the loopback interface and streams results to the browser as
  they are found.
  .
- The interface binds to 127.0.0.1 only, requires a per-process random token on
+ The interface binds to loopback only, requires a per-process random token on
  every request and rejects unexpected Host headers, because it performs
  outbound requests on behalf of whoever can reach it.
  .
