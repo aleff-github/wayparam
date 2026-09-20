@@ -24,8 +24,7 @@ from .config import RunConfig
 from .filters import is_boring
 from .normalize import canonicalize_url
 from .output import UrlRecord, now_utc_iso, open_outfile, write_record
-from .ratelimit import RateLimiter
-from .wayback import iter_original_urls
+from .providers import UrlProvider, build_providers
 
 log = logging.getLogger("wayparam")
 
@@ -132,11 +131,11 @@ async def _process_domain(
     cfg: RunConfig,
     *,
     client: httpx.AsyncClient,
-    rate_limiter: RateLimiter | None,
+    providers: list[UrlProvider],
     on_record: RecordCallback | None,
     on_progress: ProgressCallback | None,
     budget: Budget,
-) -> tuple[DomainStats, Exception | None]:
+) -> tuple[DomainStats, list[Exception]]:
     """Process one domain, returning what it produced *and* what stopped it.
 
     A domain that dies halfway through pagination has still produced real
@@ -146,78 +145,79 @@ async def _process_domain(
     fetched = 0
     kept = 0
     complete = True
-    error: Exception | None = None
+    errors: list[Exception] = []
     seen: set[int] = set()
 
     out_fh = (
         open_outfile(_outfile_for(cfg.outdir, domain, cfg.out_format)) if cfg.write_files else None
     )
 
-    urls = iter_original_urls(
-        domain,
-        client=client,
-        http_config=cfg.http,
-        rate_limiter=rate_limiter,
-        opt=cfg.cdx,
-    )
     try:
-        async for raw in urls:
-            fetched += 1
-            if on_progress and fetched % _PROGRESS_EVERY == 0:
-                on_progress(domain, fetched, kept)
-
-            # Filter before canonicalizing: most archived URLs are static
-            # assets, so the early exit is what keeps the common path cheap.
-            # Re-checking the canonical form afterwards would be redundant --
-            # canonicalization leaves the path untouched, which is all
-            # is_boring() looks at.
-            if is_boring(raw, cfg.filters):
-                continue
-
-            canon = canonicalize_url(raw, cfg.normalize)
-            if canon is None:
-                continue
-
-            fp = fingerprint(canon)
-            if fp in seen:
-                continue
-            seen.add(fp)
-
-            if not budget.take():
+        for provider_index, provider in enumerate(providers):
+            if budget.exhausted:
                 complete = False
                 break
 
-            kept += 1
-            rec = UrlRecord(domain=domain, url=canon, fetched_at=now_utc_iso())
+            records = provider.iter_urls(domain, client=client)
+            try:
+                async for item in records:
+                    fetched += 1
+                    if on_progress and fetched % _PROGRESS_EVERY == 0:
+                        on_progress(domain, fetched, kept)
 
-            if out_fh:
-                write_record(out_fh, rec, cfg.out_format)
-                if kept % _FLUSH_EVERY == 0:
-                    out_fh.flush()
-            if on_record:
-                on_record(rec)
+                    # Filter before canonicalizing: most archived URLs are static
+                    # assets, so the early exit is what keeps the common path cheap.
+                    if is_boring(item.original, cfg.filters):
+                        continue
 
-    except BrokenPipeError:
-        # The consumer went away: that ends the whole run, not this domain.
-        raise
-    except Exception as exc:  # noqa: BLE001 - reported, never swallowed
-        complete = False
-        error = exc
+                    canon = canonicalize_url(item.original, cfg.normalize)
+                    if canon is None:
+                        continue
+
+                    fp = fingerprint(canon)
+                    if fp in seen:
+                        continue
+                    seen.add(fp)
+
+                    if not budget.take():
+                        complete = False
+                        break
+
+                    kept += 1
+                    rec = UrlRecord(
+                        domain=domain,
+                        url=canon,
+                        source=item.source,
+                        fetched_at=now_utc_iso(),
+                    )
+
+                    if out_fh:
+                        write_record(out_fh, rec, cfg.out_format)
+                        if kept % _FLUSH_EVERY == 0:
+                            out_fh.flush()
+                    if on_record:
+                        on_record(rec)
+
+            except BrokenPipeError:
+                raise
+            except Exception as exc:  # noqa: BLE001 - one source may fail while another works
+                complete = False
+                errors.append(RuntimeError(f"{provider.name}: {exc}"))
+            finally:
+                try:
+                    await records.aclose()
+                except Exception:  # noqa: BLE001 - never mask the original failure
+                    log.debug("closing the %s iterator failed", provider.name, exc_info=True)
+
+            if budget.exhausted and provider_index < len(providers) - 1:
+                complete = False
+                break
     finally:
-        # Every early exit -- the budget, a closed pipe -- leaves this
-        # generator suspended mid-stream. Left alone it would be finalised at
-        # loop shutdown, by which point the HTTP client it streams from is
-        # already closed, and the teardown fails noisily. Close it here, while
-        # the client is still alive.
-        try:
-            await urls.aclose()
-        except Exception:  # noqa: BLE001 - never mask why we are unwinding
-            log.debug("closing the CDX iterator failed", exc_info=True)
         if out_fh:
             out_fh.close()
 
     stats = DomainStats(domain=domain, fetched=fetched, kept=kept, complete=complete)
-    return stats, error
+    return stats, errors
 
 
 async def run(
@@ -240,21 +240,21 @@ async def run(
         max_connections=max(10, cfg.concurrency * 4),
         max_keepalive_connections=max(10, cfg.concurrency * 2),
     )
-    rate_limiter = RateLimiter(cfg.rps) if cfg.rps > 0 else None
     sem = asyncio.Semaphore(max(1, cfg.concurrency))
     budget = Budget(cfg.max_results)
+    providers = build_providers(cfg)
 
-    async def guarded(domain: str) -> tuple[DomainStats, Exception | None]:
+    async def guarded(domain: str) -> tuple[DomainStats, list[Exception]]:
         async with sem:
             if budget.exhausted:
                 # The cap was reached while this domain waited its turn; there
                 # is nothing to fetch it for.
-                return DomainStats(domain=domain, fetched=0, kept=0, complete=False), None
+                return DomainStats(domain=domain, fetched=0, kept=0, complete=False), []
             return await _process_domain(
                 domain,
                 cfg,
                 client=client,
-                rate_limiter=rate_limiter,
+                providers=providers,
                 on_record=on_record,
                 on_progress=on_progress,
                 budget=budget,
@@ -272,10 +272,9 @@ async def run(
             # Nothing came back at all: no stats to report for this domain.
             out.errors.append((domain, r))  # type: ignore[arg-type]
             continue
-        stats, error = r
+        stats, errors = r
         out.stats.append(stats)
-        if error is not None:
-            out.errors.append((domain, error))
+        out.errors.extend((domain, error) for error in errors)
         log.info(
             "%s: fetched=%d kept=%d%s",
             stats.domain,

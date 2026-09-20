@@ -53,7 +53,7 @@
   @keyframes pulse { 50% { opacity: .25; } }
 </style>
 
-<header><h1>wayparam <span>— Wayback CDX URL parameter collector</span></h1></header>
+<header><h1>wayparam <span>— web archive URL parameter collector</span></h1></header>
 
 <main>
   <form id="f">
@@ -61,6 +61,18 @@
       <legend>Target</legend>
       <label><span>Domains (one per line)</span>
         <textarea id="domains" placeholder="example.com" autofocus></textarea></label>
+      <label><span>Archive source</span>
+        <select id="source">
+          <option value="wayback">Wayback</option>
+          <option value="commoncrawl">Common Crawl</option>
+          <option value="wayback,commoncrawl">Wayback + Common Crawl</option>
+        </select></label>
+      <label><span>Common Crawl index(es)</span>
+        <input type="text" id="cc_index" value="latest" placeholder="latest,CC-MAIN-2026-39"></label>
+      <div class="row">
+        <label><span>CC blocks/page</span><input type="number" id="cc_page_size" value="5" min="1" max="100"></label>
+        <label><span>CC req/s</span><input type="number" id="cc_rps" value="1" min="0" step="0.25"></label>
+      </div>
       <div class="check"><input type="checkbox" id="include_subdomains"><span>Include subdomains</span></div>
       <div class="row">
         <label><span>From (year/ts)</span><input type="text" id="from_ts" placeholder="2015"></label>
@@ -173,6 +185,9 @@
       ext_blacklist: val("ext_blacklist"), ext_whitelist: val("ext_whitelist"),
       concurrency: Number(val("concurrency")) || 6, rps: Number(val("rps")) || 0,
       proxy: val("proxy"), outdir: val("outdir"), format: val("format"),
+      source: val("source"), cc_index: val("cc_index") || "latest",
+      cc_page_size: Number(val("cc_page_size")) || 5,
+      cc_rps: Number(val("cc_rps")),
       analysis: val("analysis")
     };
   }
@@ -180,7 +195,8 @@
   function handle(ev) {
     if (ev.type === "url") addResult(ev.url);
     else if (ev.type === "analysis") addResult(ev.text);
-    else if (ev.type === "start") msg("Searching " + ev.domains.join(", ") + " …");
+    else if (ev.type === "start") msg(
+      "Searching " + ev.domains.join(", ") + " via " + (ev.sources || ["wayback"]).join(", ") + " …");
     else if (ev.type === "stats") msg(
       `${ev.domain}: fetched=${ev.fetched} kept=${ev.kept}` + (ev.complete === false ? " (incomplete)" : ""),
       ev.complete === false ? "err" : "ok");
@@ -224,6 +240,19 @@
   });
 
   $("stop").addEventListener("click", () => controller && controller.abort());
+
+  function syncSourceControls() {
+    const source = val("source");
+    const usesCc = source.includes("commoncrawl");
+    $("cc_index").disabled = !usesCc;
+    $("cc_page_size").disabled = !usesCc;
+    $("cc_rps").disabled = !usesCc;
+    const analysisAllowed = source === "wayback";
+    if (!analysisAllowed) $("analysis").value = "";
+    $("analysis").disabled = !analysisAllowed;
+  }
+  $("source").addEventListener("change", syncSourceControls);
+  syncSourceControls();
 
   $("copy").addEventListener("click", async () => {
     await navigator.clipboard.writeText(items.join("\n"));

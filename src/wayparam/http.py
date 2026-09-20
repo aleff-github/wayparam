@@ -51,6 +51,7 @@ async def iter_lines(
     *,
     params: list[tuple[str, str]] | None = None,
     config: HttpConfig,
+    empty_statuses: set[int] | None = None,
 ) -> AsyncIterator[str]:
     """Yield the response's non-empty lines as they arrive.
 
@@ -75,6 +76,9 @@ async def iter_lines(
                 "GET", url, params=query, headers=headers, timeout=config.timeout_s
             ) as resp:
                 last_status = resp.status_code
+
+                if resp.status_code in (empty_statuses or set()):
+                    return
 
                 if resp.status_code in (429, 503):
                     if attempt >= config.retries:
@@ -120,6 +124,7 @@ async def get_text(
     *,
     params: list[tuple[str, str]] | None = None,
     config: HttpConfig,
+    empty_statuses: set[int] | None = None,
 ) -> str:
     headers = {"User-Agent": _pick_ua(config)}
     # httpx accepts a list of pairs, but `list` is invariant, so a
@@ -135,6 +140,8 @@ async def get_text(
             resp = await client.get(url, params=query, headers=headers, timeout=config.timeout_s)
 
             last_status = resp.status_code
+            if resp.status_code in (empty_statuses or set()):
+                return ""
             if resp.status_code in (429, 503):
                 if attempt >= config.retries:
                     break  # last attempt: sleeping before giving up buys nothing

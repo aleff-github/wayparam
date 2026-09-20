@@ -25,9 +25,29 @@ from .http import HttpConfig
 from .io import normalize_domain, read_domains
 from .normalize import NormalizeOptions
 from .output import UrlRecord, print_hint_stderr, print_record_stdout
+from .providers import CommonCrawlOptions, SourceName, parse_source_names
 from .wayback import PAGINATION_MODES, CdxOptions
 
 log = logging.getLogger("wayparam")
+
+
+def _source_list(value: str) -> tuple[SourceName, ...]:
+    try:
+        return parse_source_names(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from None
+
+
+def _cc_indexes(values: list[str] | None) -> tuple[str, ...]:
+    if not values:
+        return ("latest",)
+    out: list[str] = []
+    for value in values:
+        for raw in value.split(","):
+            index = raw.strip()
+            if index and index not in out:
+                out.append(index)
+    return tuple(out or ["latest"])
 
 
 def _positive_int(value: str) -> int:
@@ -73,7 +93,7 @@ def _nonnegative_float(value: str) -> float:
 def build_arg_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="wayparam",
-        description="Fetch and normalize parameterized URLs from the Wayback CDX API.",
+        description="Fetch and normalize parameterized URLs from web archive indexes.",
     )
 
     src = p.add_mutually_exclusive_group(required=True)
@@ -100,6 +120,15 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--quiet", action="store_true", help="Only show errors (stderr).")
 
+    p.add_argument(
+        "--source",
+        type=_source_list,
+        default=("wayback",),
+        metavar="NAME[,NAME...]",
+        help="Archive source(s) in priority order: wayback, commoncrawl "
+        "(default: wayback). Combined sources are deduplicated.",
+    )
+
     analysis = p.add_mutually_exclusive_group()
     analysis.add_argument(
         "--history",
@@ -123,7 +152,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Emit one historical summary record per domain.",
     )
 
-    # Wayback/CDX options
+    # Shared archive query options
     p.add_argument(
         "--include-subdomains", action="store_true", help="Include subdomains (matchType=domain)."
     )
@@ -138,7 +167,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--filter",
         action="append",
         default=None,
-        help="CDX filter string (repeatable). Example: statuscode:200",
+        help="Wayback CDX filter string (repeatable). Example: statuscode:200",
     )
     p.add_argument(
         "--limit",
@@ -171,6 +200,34 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=0,
         help="Stop after this many emitted URLs; in analysis modes, accepted captures "
         "(0 = no cap).",
+    )
+
+    # Common Crawl options
+    p.add_argument(
+        "--cc-index",
+        action="append",
+        default=None,
+        metavar="ID",
+        help="Common Crawl index ID (repeatable or comma-separated). "
+        "Use 'latest' for the newest crawl (default: latest).",
+    )
+    p.add_argument(
+        "--cc-page-size",
+        type=_positive_int,
+        default=5,
+        help="Common Crawl compressed index blocks per page (default: 5).",
+    )
+    p.add_argument(
+        "--cc-rps",
+        type=_nonnegative_float,
+        default=1.0,
+        help="Common Crawl index requests per second (default: 1).",
+    )
+    p.add_argument(
+        "--cc-filter",
+        action="append",
+        default=None,
+        help="Common Crawl CDXJ filter string (repeatable). Example: status:200",
     )
 
     # Normalization/filtering options
@@ -308,6 +365,7 @@ def build_config(args: argparse.Namespace) -> RunConfig:
 
     return RunConfig(
         domains=domains,
+        sources=args.source,
         outdir=Path(args.outdir),
         write_files=not args.no_files,
         out_format=args.format,
@@ -330,6 +388,12 @@ def build_config(args: argparse.Namespace) -> RunConfig:
             filters=args.filter,
             pagination=args.pagination,
             block_size=max(1, args.block_size),
+        ),
+        commoncrawl=CommonCrawlOptions(
+            indexes=_cc_indexes(args.cc_index),
+            page_size=args.cc_page_size,
+            rps=args.cc_rps,
+            filters=tuple(args.cc_filter or ()),
         ),
         normalize=NormalizeOptions(
             placeholder=args.placeholder,
@@ -380,6 +444,20 @@ def main(argv: list[str] | None = None) -> int:
 
     if not cfg.domains:
         parser.error("no domains to process")
+
+    if cfg.analysis and cfg.sources != ("wayback",):
+        parser.error("--history/--params/--summary currently require --source wayback")
+
+    if "commoncrawl" in cfg.sources and cfg.http.proxy:
+        log.warning(
+            "Common Crawl advises against proxy networks for its public index API; "
+            "the configured proxy will still be used."
+        )
+    if "commoncrawl" in cfg.sources and cfg.commoncrawl.rps <= 0:
+        log.warning(
+            "Common Crawl recommends sleeping between index API calls; "
+            "--cc-rps 0 disables that protection."
+        )
 
     progress = _make_progress(args.quiet)
     try:

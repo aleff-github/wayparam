@@ -299,3 +299,46 @@ def test_iter_lines_raises_after_retries_with_the_status():
         assert "status=503" in str(e)
     else:
         raise AssertionError("expected RuntimeError")
+
+
+def test_get_text_can_treat_provider_specific_status_as_empty():
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        return httpx.Response(404, text="no captures")
+
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return await get_text(
+                client,
+                "https://index.commoncrawl.org/example-index",
+                config=HttpConfig(retries=3, backoff_base_s=0.0, max_backoff_s=0.0),
+                empty_statuses={404},
+            )
+
+    assert asyncio.run(run()) == ""
+    assert calls["n"] == 1
+
+
+def test_iter_lines_can_treat_provider_specific_status_as_empty():
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        return httpx.Response(404, text="no captures")
+
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return [
+                line
+                async for line in iter_lines(
+                    client,
+                    "https://index.commoncrawl.org/example-index",
+                    config=HttpConfig(retries=3, backoff_base_s=0.0, max_backoff_s=0.0),
+                    empty_statuses={404},
+                )
+            ]
+
+    assert asyncio.run(run()) == []
+    assert calls["n"] == 1

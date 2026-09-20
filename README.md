@@ -4,11 +4,11 @@
 [![PyPI](https://img.shields.io/pypi/v/wayparam?color=A81D33)](https://pypi.org/project/wayparam/)
 [![BlackArch](https://img.shields.io/badge/BlackArch-available-1793D1?logo=archlinux&logoColor=white)](https://github.com/BlackArch/blackarch/tree/master/packages/wayparam)
 
-**wayparam** is a modern, cross-platform CLI tool to **fetch historical URLs from the Internet Archive Wayback CDX API**, filter out “boring” URLs (static assets), and **normalize query parameters** so you can focus on endpoints that actually matter.
+**wayparam** is a modern, cross-platform CLI tool to **fetch historical URLs from public web archive indexes**, filter out “boring” URLs (static assets), and **normalize query parameters** so you can focus on endpoints that actually matter. Wayback remains the default source, with Common Crawl available as an opt-in provider.
 
 This project is **inspired by ParamSpider** (same overall goal, completely rewritten with a more robust architecture, modern async I/O, better filtering, and production-friendly output behavior).
 
-> OSINT tool: **wayparam does not crawl targets**. It only queries the Wayback CDX API.
+> OSINT tool: **wayparam does not crawl targets**. It queries public archive indexes (Wayback and, optionally, Common Crawl).
 
 Convert this `example.com` into something like this:
 
@@ -24,7 +24,7 @@ http://www.example.com/?format=FUZZ&retailerId=FUZZ
 
 ## Key features
 
-- **Wayback CDX API** URL collection (single domain or list)
+- **Multi-source archive collection**: Wayback CDX (default), Common Crawl CDXJ, or both
 - **Async + concurrency** for speed on multiple domains
 - **Rate limiting** (`--rps`) to be polite with Wayback/CDX
 - **Retry + backoff** and clearer error messages
@@ -172,13 +172,27 @@ wayparam -d example.com --include-subdomains --rps 1 --concurrency 2
 wayparam -d example.com --ext-blacklist ".png,.jpg,.css,.js" --exclude-path-regex "^/static/"
 ```
 
-### 7) Historical endpoint intelligence
+### 7) Query Common Crawl instead of Wayback
+
+```bash
+wayparam -d example.com --source commoncrawl
+```
+
+### 8) Combine Wayback + Common Crawl
+
+```bash
+wayparam -d example.com --source wayback,commoncrawl
+```
+
+The source order is the priority order. Results are deduplicated across providers; in JSONL, `source` records the provider that found a normalized URL first.
+
+### 9) Historical endpoint intelligence
 
 ```bash
 wayparam -d example.com --history --stdout --no-files --format jsonl
 ```
 
-### 8) Parameter history or a domain summary
+### 10) Parameter history or a domain summary
 
 ```bash
 wayparam -d example.com --params
@@ -196,14 +210,13 @@ Historical modes retrieve capture metadata and automatically disable CDX collaps
    * `-d/--domain` for a single host
    * `-l/--list` for multiple hosts (one per line, supports comments and basic normalization)
 
-2. **Query the Wayback CDX API**
+2. **Query configured archive providers**
 
-   * Requests are sent to the CDX endpoint (Wayback Machine)
-   * Uses `matchType=host` by default, or `matchType=domain` when `--include-subdomains` is enabled
-   * Walks multi-page results losslessly: one probe request, then the block
-     pagination API (`showNumPages`/`page`) when the result spans pages, because
-     the `resumeKey` walk silently drops one row per boundary while `collapse`
-     is enabled
+   * Wayback remains the default and keeps its lossless `auto` pagination behavior
+   * Common Crawl resolves `latest` from `collinfo.json` or uses explicitly pinned crawl IDs
+   * Common Crawl walks CDXJ ZipNum pages and serializes/rate-limits requests by default
+   * `matchType=host` is used by default, or `matchType=domain` with `--include-subdomains`
+   * When several providers are selected, normalized URLs are deduplicated across them in source order
 
 3. **Filter “boring” URLs**
 
@@ -245,6 +258,18 @@ wayparam -d example.com --stdout --no-files | sort -u > urls.txt
 ---
 
 ## Common options
+
+### Archive sources
+
+* `--source wayback` (default)
+* `--source commoncrawl`
+* `--source wayback,commoncrawl` (ordered priority)
+* `--cc-index latest` or a crawl such as `CC-MAIN-2026-39` (repeatable)
+* `--cc-page-size 5` (compressed Common Crawl index blocks per page)
+* `--cc-rps 1` (Common Crawl request rate; default intentionally conservative)
+* `--cc-filter status:200` (repeatable Common Crawl-native CDXJ filter)
+
+See [Archive sources](docs/sources.md) for provider behavior and caveats.
 
 ### Wayback/CDX
 
@@ -346,4 +371,4 @@ See the `LICENSE` file for details.
 
 ## Disclaimer
 
-Use responsibly and lawfully. This tool queries the Internet Archive and does not actively scan targets, but your downstream usage of collected URLs may have legal and ethical implications depending on context.
+Use responsibly and lawfully. This tool queries public web archive indexes and does not actively scan targets, but your downstream usage of collected URLs may have legal and ethical implications depending on context.

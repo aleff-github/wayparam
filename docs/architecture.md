@@ -8,27 +8,32 @@ wayparam is intentionally modular. Each module has a single responsibility, whic
    - Parse user input
    - Build a frontend-independent RunConfig
 2. **core.py**
-   - Orchestrates concurrency, filtering, normalization, deduplication and output
-3. **analysis.py**
+   - Orchestrates concurrency, filtering, normalization, cross-provider deduplication and output
+3. **providers/**
+   - Defines the archive-provider contract and source records
+   - Adapts Wayback to the provider interface
+   - Implements Common Crawl collection discovery and CDXJ pagination
+4. **analysis.py**
    - Aggregates uncollapsed capture metadata into endpoint, parameter and domain views
    - Formats deterministic TXT/JSONL historical output
-4. **wayback.py**
+5. **wayback.py**
    - Builds CDX query parameters
    - Handles pagination/resumeKey
    - Exposes both URL-only and capture-metadata iterators
-5. **http.py**
+6. **http.py**
    - Makes resilient HTTP requests (retries, backoff)
-6. **filters.py**
+7. **filters.py**
    - Drops “boring” URLs (static assets) early
-7. **normalize.py**
+8. **normalize.py**
    - Canonicalizes and normalizes URLs (stable output)
-8. **output.py**
+9. **output.py**
    - Writes records to files and/or stdout (txt/jsonl)
-9. **ratelimit.py**
+10. **ratelimit.py**
    - Global RPS limiter (optional)
 
 ## Why this structure matters
 
 - unit tests focus on pure logic (`normalize.py`, `filters.py`, parsing)
 - integration tests mock HTTP at the transport layer (httpx MockTransport)
+- providers share one normalization/dedup pipeline, so adding a source does not fork output semantics
 - CLI stays pipeline-friendly: stdout is clean and predictable
