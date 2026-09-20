@@ -1,0 +1,130 @@
+# Historical intelligence
+
+wayparam can aggregate capture-level metadata from the Wayback CDX API instead
+of returning only normalized URLs.
+
+The three analysis views are mutually exclusive:
+
+```bash
+wayparam -d example.com --history
+wayparam -d example.com --params
+wayparam -d example.com --summary
+```
+
+They work with the normal filtering, date-range, subdomain, proxy, rate-limit
+and output options.
+
+## Why analysis mode disables CDX collapse
+
+Normal URL collection uses `collapse=urlkey` by default because only one
+representative capture is needed for each archived URL.
+
+Historical statistics are different. First-seen/last-seen dates and capture
+counts require every matching capture, so analysis mode automatically queries
+CDX without collapse. This can transfer substantially more data than a normal
+run.
+
+Use `--from` / `--to`, CDX `--filter` rules, `--rps`, or
+`--max-results` to bound the work. In analysis mode, `--max-results` limits
+the number of **accepted capture rows** after wayparam's normal filtering and
+normalization, not the number of final aggregate records.
+
+## `--history`
+
+One output record is produced for every normalized URL shape.
+
+With the default placeholder behavior, captures such as:
+
+```text
+https://example.com/item?id=1&lang=en
+https://example.com/item?id=2&lang=en
+```
+
+are grouped under:
+
+```text
+https://example.com/item?id=FUZZ&lang=FUZZ
+```
+
+Each record contains:
+
+- normalized URL
+- first capture timestamp
+- last capture timestamp
+- number of accepted captures
+- status-code counts
+- MIME-type counts
+
+JSONL is convenient for downstream analysis:
+
+```bash
+wayparam -d example.com --history --stdout --no-files --format jsonl
+```
+
+## `--params`
+
+This view aggregates by query-parameter name.
+
+Each record contains:
+
+- parameter name
+- number of normalized endpoints using it
+- total captures represented by those endpoints
+- first-seen timestamp
+- last-seen timestamp
+
+Example:
+
+```bash
+wayparam -d example.com --params --stdout --no-files
+```
+
+The text format is tab-separated:
+
+```text
+id       14      328     20150203010203  20260819094410
+redirect 3       41      20190601000000  20260412115322
+```
+
+## `--summary`
+
+This produces one record per domain with:
+
+- raw CDX captures fetched
+- accepted captures after filters/normalization
+- unique normalized URLs
+- unique parameter names
+- first/last seen
+- status-code distribution
+- MIME-type distribution
+
+Example:
+
+```bash
+wayparam -d example.com --summary --format jsonl --stdout --no-files
+```
+
+## Output files
+
+When files are enabled, analysis views do not overwrite the normal URL output.
+They use mode-specific names:
+
+```text
+results/example.com.history.txt
+results/example.com.params.txt
+results/example.com.summary.txt
+```
+
+With `--format jsonl`, the extension is `.jsonl`.
+
+## Web UI
+
+The local web interface exposes the same four views from the **View** selector:
+
+- Normalized URLs
+- Historical endpoints
+- Historical parameters
+- Domain summary
+
+Historical records are emitted after each domain has been aggregated, while the
+normal URL view continues to stream URLs as they are discovered.

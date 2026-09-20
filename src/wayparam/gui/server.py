@@ -23,10 +23,12 @@ import socket
 import sys
 import threading
 from pathlib import Path
+from typing import Optional, cast
 from urllib.parse import parse_qs, urlsplit
 
 from .. import __version__
-from ..config import RunConfig, build_filter_options
+from ..analysis import format_record, records_for, run_history, write_analysis_files
+from ..config import AnalysisMode, RunConfig, build_filter_options
 from ..core import run
 from ..http import HttpConfig
 from ..io import parse_domains
@@ -61,6 +63,11 @@ def config_from_request(data: dict) -> RunConfig:
 
     outdir = str(data.get("outdir", "") or "").strip()
     write_files = bool(outdir)
+    raw_analysis = str(data.get("analysis", "") or "").strip()
+    analysis = cast(
+        Optional[AnalysisMode],
+        raw_analysis if raw_analysis in ("history", "params", "summary") else None,
+    )
 
     def _int(key: str, default: int, lo: int, hi: int) -> int:
         try:
@@ -82,6 +89,7 @@ def config_from_request(data: dict) -> RunConfig:
         outdir=Path(outdir) if write_files else Path("results"),
         write_files=write_files,
         out_format="jsonl" if data.get("format") == "jsonl" else "txt",
+        analysis=analysis,
         concurrency=_int("concurrency", 6, 1, 64),
         rps=_float("rps", 0.0, 0.0, 1000.0),
         http=HttpConfig(
@@ -229,9 +237,30 @@ class Handler(http.server.BaseHTTPRequestHandler):
             chunk({"type": "url", "domain": rec.domain, "url": rec.url})
 
         try:
-            chunk({"type": "start", "domains": cfg.domains})
-            result = asyncio.run(run(cfg, on_record=on_record))
-            for st in result.stats:
+            chunk({"type": "start", "domains": cfg.domains, "analysis": cfg.analysis})
+            if cfg.analysis:
+                history_result = asyncio.run(run_history(cfg))
+                write_analysis_files(history_result, cfg, cfg.analysis)
+                for domain in cfg.domains:
+                    history = history_result.analyses.get(domain)
+                    if history is None:
+                        continue
+                    for record in records_for(history, cfg.analysis):
+                        chunk(
+                            {
+                                "type": "analysis",
+                                "mode": cfg.analysis,
+                                "record": record,
+                                "text": format_record(record, cfg.out_format),
+                            }
+                        )
+                stats = history_result.stats
+                errors = history_result.errors
+            else:
+                url_result = asyncio.run(run(cfg, on_record=on_record))
+                stats = url_result.stats
+                errors = url_result.errors
+            for st in stats:
                 chunk(
                     {
                         "type": "stats",
@@ -241,7 +270,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                         "complete": st.complete,
                     }
                 )
-            for domain, exc in result.errors:
+            for domain, exc in errors:
                 chunk({"type": "error", "domain": domain, "message": str(exc)})
             chunk({"type": "done"})
             self.wfile.write(b"0\r\n\r\n")

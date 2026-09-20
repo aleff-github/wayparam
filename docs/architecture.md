@@ -9,18 +9,22 @@ wayparam is intentionally modular. Each module has a single responsibility, whic
    - Build a frontend-independent RunConfig
 2. **core.py**
    - Orchestrates concurrency, filtering, normalization, deduplication and output
-3. **wayback.py**
+3. **analysis.py**
+   - Aggregates uncollapsed capture metadata into endpoint, parameter and domain views
+   - Formats deterministic TXT/JSONL historical output
+4. **wayback.py**
    - Builds CDX query parameters
    - Handles pagination/resumeKey
-4. **http.py**
+   - Exposes both URL-only and capture-metadata iterators
+5. **http.py**
    - Makes resilient HTTP requests (retries, backoff)
-5. **filters.py**
+6. **filters.py**
    - Drops “boring” URLs (static assets) early
-6. **normalize.py**
+7. **normalize.py**
    - Canonicalizes and normalizes URLs (stable output)
-7. **output.py**
+8. **output.py**
    - Writes records to files and/or stdout (txt/jsonl)
-8. **ratelimit.py**
+9. **ratelimit.py**
    - Global RPS limiter (optional)
 
 ## Why this structure matters

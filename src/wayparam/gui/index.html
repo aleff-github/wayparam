@@ -95,6 +95,13 @@
 
     <fieldset>
       <legend>Output</legend>
+      <label><span>View</span>
+        <select id="analysis">
+          <option value="">Normalized URLs</option>
+          <option value="history">Historical endpoints</option>
+          <option value="params">Historical parameters</option>
+          <option value="summary">Domain summary</option>
+        </select></label>
       <label><span>Also write files to (blank = stream only)</span>
         <input type="text" id="outdir" placeholder="results"></label>
       <label><span>Format</span>
@@ -123,7 +130,7 @@
   const token = new URLSearchParams(location.search).get("t") || "";
   const $ = id => document.getElementById(id);
   const results = $("results"), count = $("count"), dot = $("dot");
-  let urls = [], controller = null;
+  let items = [], controller = null;
 
   const val = id => $(id).value.trim();
   const on  = id => $(id).checked;
@@ -136,23 +143,23 @@
     results.scrollTop = results.scrollHeight;
   }
 
-  function addUrl(u) {
-    urls.push(u);
+  function addResult(text) {
+    items.push(text);
     const d = document.createElement("div");
-    d.textContent = u;
+    d.textContent = text;
     results.appendChild(d);
     // Only autoscroll when the user is already at the bottom.
     if (results.scrollHeight - results.scrollTop - results.clientHeight < 60) {
       results.scrollTop = results.scrollHeight;
     }
-    count.textContent = urls.length.toLocaleString() + " URLs";
+    count.textContent = items.length.toLocaleString() + " results";
   }
 
   function running(isRunning) {
     $("go").disabled = isRunning;
     $("stop").disabled = !isRunning;
     dot.className = "dot" + (isRunning ? " live" : "");
-    const has = urls.length > 0;
+    const has = items.length > 0;
     $("copy").disabled = !has;
     $("save").disabled = !has;
   }
@@ -165,12 +172,14 @@
       all_urls: on("all_urls"), drop_tracking: on("drop_tracking"),
       ext_blacklist: val("ext_blacklist"), ext_whitelist: val("ext_whitelist"),
       concurrency: Number(val("concurrency")) || 6, rps: Number(val("rps")) || 0,
-      proxy: val("proxy"), outdir: val("outdir"), format: val("format")
+      proxy: val("proxy"), outdir: val("outdir"), format: val("format"),
+      analysis: val("analysis")
     };
   }
 
   function handle(ev) {
-    if (ev.type === "url") addUrl(ev.url);
+    if (ev.type === "url") addResult(ev.url);
+    else if (ev.type === "analysis") addResult(ev.text);
     else if (ev.type === "start") msg("Searching " + ev.domains.join(", ") + " …");
     else if (ev.type === "stats") msg(
       `${ev.domain}: fetched=${ev.fetched} kept=${ev.kept}` + (ev.complete === false ? " (incomplete)" : ""),
@@ -181,7 +190,7 @@
 
   $("f").addEventListener("submit", async e => {
     e.preventDefault();
-    results.textContent = ""; urls = []; count.textContent = "0 URLs";
+    results.textContent = ""; items = []; count.textContent = "0 results";
     controller = new AbortController();
     running(true);
     try {
@@ -217,16 +226,18 @@
   $("stop").addEventListener("click", () => controller && controller.abort());
 
   $("copy").addEventListener("click", async () => {
-    await navigator.clipboard.writeText(urls.join("\n"));
+    await navigator.clipboard.writeText(items.join("\n"));
     $("copy").textContent = "Copied";
     setTimeout(() => ($("copy").textContent = "Copy"), 1200);
   });
 
   $("save").addEventListener("click", () => {
-    const blob = new Blob([urls.join("\n") + "\n"], { type: "text/plain" });
+    const blob = new Blob([items.join("\n") + "\n"], { type: "text/plain" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "wayparam.txt";
+    const mode = val("analysis");
+    const extension = val("format") === "jsonl" ? "jsonl" : "txt";
+    a.download = mode ? ("wayparam." + mode + "." + extension) : ("wayparam." + extension);
     a.click();
     URL.revokeObjectURL(a.href);
   });

@@ -12,6 +12,13 @@ import sys
 from pathlib import Path
 
 from . import __version__
+from .analysis import (
+    HistoryRunResult,
+    format_record,
+    records_for,
+    run_history,
+    write_analysis_files,
+)
 from .config import RunConfig, build_filter_options
 from .core import RunResult, run
 from .http import HttpConfig
@@ -93,6 +100,29 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--quiet", action="store_true", help="Only show errors (stderr).")
 
+    analysis = p.add_mutually_exclusive_group()
+    analysis.add_argument(
+        "--history",
+        dest="analysis",
+        action="store_const",
+        const="history",
+        help="Aggregate capture history per normalized URL (first/last seen, counts, status/MIME).",
+    )
+    analysis.add_argument(
+        "--params",
+        dest="analysis",
+        action="store_const",
+        const="params",
+        help="Aggregate historical prevalence per query-parameter name.",
+    )
+    analysis.add_argument(
+        "--summary",
+        dest="analysis",
+        action="store_const",
+        const="summary",
+        help="Emit one historical summary record per domain.",
+    )
+
     # Wayback/CDX options
     p.add_argument(
         "--include-subdomains", action="store_true", help="Include subdomains (matchType=domain)."
@@ -139,7 +169,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--max-results",
         type=_nonnegative_int,
         default=0,
-        help="Stop the whole run after this many URLs (0 = no cap).",
+        help="Stop after this many emitted URLs; in analysis modes, accepted captures "
+        "(0 = no cap).",
     )
 
     # Normalization/filtering options
@@ -280,6 +311,7 @@ def build_config(args: argparse.Namespace) -> RunConfig:
         outdir=Path(args.outdir),
         write_files=not args.no_files,
         out_format=args.format,
+        analysis=args.analysis,
         max_results=max(0, args.max_results),
         concurrency=args.concurrency,
         rps=args.rps,
@@ -313,7 +345,7 @@ def build_config(args: argparse.Namespace) -> RunConfig:
     )
 
 
-def _report(result: RunResult, cfg: RunConfig, show_stats: bool) -> int:
+def _report(result: RunResult | HistoryRunResult, cfg: RunConfig, show_stats: bool) -> int:
     for domain, exc in result.errors:
         log.error("%s: %s", domain, exc)
         _maybe_print_wayback_vpn_hint(exc)
@@ -357,12 +389,27 @@ def main(argv: list[str] | None = None) -> int:
             def on_record(rec: UrlRecord) -> None:
                 print_record_stdout(rec, cfg.out_format)
 
-        result = asyncio.run(run(cfg, on_record=on_record, on_progress=progress))
+        if cfg.analysis:
+            history_result = asyncio.run(run_history(cfg, on_progress=progress))
+            if progress:
+                progress.clear()
+
+            write_analysis_files(history_result, cfg, cfg.analysis)
+            if args.stdout:
+                for domain in cfg.domains:
+                    history = history_result.analyses.get(domain)
+                    if history is None:
+                        continue
+                    for record in records_for(history, cfg.analysis):
+                        print(format_record(record, cfg.out_format), flush=True)
+            return _report(history_result, cfg, args.stats)
+
+        url_result = asyncio.run(run(cfg, on_record=on_record, on_progress=progress))
         # Erase the status line before anything else writes to stderr, or the
         # report lands on the same line as the last progress update.
         if progress:
             progress.clear()
-        return _report(result, cfg, args.stats)
+        return _report(url_result, cfg, args.stats)
     except KeyboardInterrupt:
         return 130
     except BrokenPipeError:

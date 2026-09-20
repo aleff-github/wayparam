@@ -27,6 +27,20 @@ returned by CDX it:
 
 ---
 
+## `wayparam.analysis`
+
+Historical modes use a separate runner so the normal URL pipeline keeps its streaming and low-memory behavior unchanged.
+
+The analysis runner requests capture metadata and forces `collapse=None`. Each accepted capture is filtered and normalized with the same code as a normal run, then grouped by the normalized URL. From that aggregate wayparam derives:
+
+- endpoint history: first/last seen, capture count, status/MIME distributions
+- parameter history: number of normalized endpoints, represented captures, first/last seen
+- domain summary: fetched/accepted captures, unique URLs/parameters and aggregate distributions
+
+`--max-results` is still a global budget, but in analysis mode it counts accepted capture rows before aggregation.
+
+---
+
 ## `wayparam.wayback`
 
 ### Endpoint
@@ -38,6 +52,7 @@ The CDX endpoint used is:
 CDX may return a resume key at the end of the response. wayparam:
 - reads the last line
 - detects `resumeKey:` forms and heuristic forms
+- parses capture rows requested as `timestamp,statuscode,mimetype,original` when metadata mode is enabled
 - loops until no resumeKey (or repeat key safety break)
 
 The resumeKey walk itself is faithful, but the server-side `collapse` is not:

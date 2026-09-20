@@ -18,7 +18,8 @@ pytest -q --cov=wayparam --cov-report=term-missing   # with coverage
 ### Unit tests (pure logic)
 - URL normalization behavior
 - extension parsing and boring URL detection (blacklist and whitelist modes)
-- resumeKey splitting logic
+- resumeKey splitting logic and capture-metadata row parsing
+- historical endpoint/parameter/domain aggregation
 - shared target parsing for CLI/list/GUI inputs, including bracketed IPv6
 - domain-list parsing (`-l`, including `-` for stdin)
 - the rate limiter, on a fake clock rather than wall time
@@ -28,11 +29,12 @@ The integration tests simulate the CDX endpoint using `httpx.MockTransport`, so:
 - **no real network** is used
 - results are deterministic and CI-friendly
 - retry and pagination logic can be exercised safely
+- metadata field selection and uncollapsed historical queries can be asserted exactly
 
 ### Web UI
 The guards (token, `Host` header, unknown paths) run against a server bound to
-an ephemeral loopback port. The streamed NDJSON run is tested by replacing
-`core.run`, so no run ever touches the network.
+an ephemeral loopback port. Normal and historical NDJSON runs are tested with
+their engines replaced by deterministic fakes, so no run ever touches the network.
 
 ## What CI enforces
 - `ruff check` and `ruff format --check`

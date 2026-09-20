@@ -1,0 +1,190 @@
+# SPDX-License-Identifier: GPL-3.0
+
+from __future__ import annotations
+
+import asyncio
+import json
+
+import httpx
+
+from wayparam import analysis
+from wayparam.analysis import (
+    DomainHistory,
+    HistoryRunResult,
+    format_record,
+    records_for,
+    run_history,
+    write_analysis_files,
+)
+from wayparam.config import RunConfig, build_filter_options
+from wayparam.http import HttpConfig
+from wayparam.wayback import CaptureRecord
+
+PAGE = "\n".join(
+    [
+        "20200101000000 200 text/html https://example.com/item?id=1&lang=en",
+        "20210101000000 302 text/html https://example.com/item?id=2&lang=en",
+        "20220101000000 200 application/json https://example.com/api?q=test",
+    ]
+)
+
+
+def _history() -> DomainHistory:
+    history = DomainHistory(domain="example.com")
+    history.fetched = 3
+    history.add(
+        "https://example.com/item?id=FUZZ&lang=FUZZ",
+        CaptureRecord(
+            original="https://example.com/item?id=1&lang=en",
+            timestamp="20200101000000",
+            status_code="200",
+            mime_type="text/html",
+        ),
+    )
+    history.add(
+        "https://example.com/item?id=FUZZ&lang=FUZZ",
+        CaptureRecord(
+            original="https://example.com/item?id=2&lang=en",
+            timestamp="20210101000000",
+            status_code="302",
+            mime_type="text/html",
+        ),
+    )
+    history.add(
+        "https://example.com/api?q=FUZZ",
+        CaptureRecord(
+            original="https://example.com/api?q=test",
+            timestamp="20220101000000",
+            status_code="200",
+            mime_type="application/json",
+        ),
+    )
+    return history
+
+
+def test_history_aggregates_capture_dates_status_and_mime():
+    history = _history()
+    records = records_for(history, "history")
+
+    item = next(record for record in records if "/item?" in record["url"])
+    assert item["captures"] == 2
+    assert item["first_seen"] == "20200101000000"
+    assert item["last_seen"] == "20210101000000"
+    assert item["status_codes"] == {"200": 1, "302": 1}
+    assert item["mime_types"] == {"text/html": 2}
+
+
+def test_parameter_view_counts_endpoints_and_captures():
+    records = {record["parameter"]: record for record in records_for(_history(), "params")}
+
+    assert records["id"]["endpoints"] == 1
+    assert records["id"]["captures"] == 2
+    assert records["lang"]["captures"] == 2
+    assert records["q"]["captures"] == 1
+
+
+def test_summary_is_one_record_per_domain():
+    (record,) = records_for(_history(), "summary")
+
+    assert record["captures"] == 3
+    assert record["accepted_captures"] == 3
+    assert record["unique_urls"] == 2
+    assert record["unique_parameters"] == 3
+    assert record["first_seen"] == "20200101000000"
+    assert record["last_seen"] == "20220101000000"
+    assert record["status_codes"] == {"200": 2, "302": 1}
+
+
+def test_jsonl_output_is_compact_and_machine_readable():
+    record = records_for(_history(), "summary")[0]
+    encoded = format_record(record, "jsonl")
+    assert json.loads(encoded) == record
+    assert " " not in encoded
+
+
+def test_text_history_output_is_tab_separated():
+    record = records_for(_history(), "history")[0]
+    encoded = format_record(record, "txt")
+    assert "\t" in encoded
+    assert encoded.count("\t") == 5
+
+
+def _cfg(tmp_path, max_results=0):
+    return RunConfig(
+        domains=["example.com"],
+        outdir=tmp_path / "out",
+        write_files=False,
+        analysis="history",
+        max_results=max_results,
+        http=HttpConfig(retries=0, backoff_base_s=0.0, max_backoff_s=0.0),
+        filters=build_filter_options(),
+    )
+
+
+def _run(tmp_path, max_results=0):
+    seen_requests = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen_requests.append(dict(request.url.params))
+        return httpx.Response(200, text=PAGE)
+
+    transport = httpx.MockTransport(handler)
+    real_client = analysis.httpx.AsyncClient
+
+    def patched(**kwargs):
+        kwargs.pop("proxy", None)
+        kwargs.pop("proxies", None)
+        return real_client(transport=transport, **kwargs)
+
+    analysis.httpx.AsyncClient = patched  # type: ignore[assignment]
+    try:
+        result = asyncio.run(run_history(_cfg(tmp_path, max_results=max_results)))
+    finally:
+        analysis.httpx.AsyncClient = real_client  # type: ignore[assignment]
+    return result, seen_requests
+
+
+def test_history_runner_requests_metadata_and_disables_collapse(tmp_path):
+    result, requests = _run(tmp_path)
+
+    assert result.ok
+    query = requests[0]
+    assert query["fl"] == "timestamp,statuscode,mimetype,original"
+    assert "collapse" not in query
+
+    history = result.analyses["example.com"]
+    assert history.fetched == 3
+    assert history.accepted == 3
+    assert len(history.endpoints) == 2
+
+
+def test_history_max_results_caps_accepted_captures(tmp_path):
+    result, _ = _run(tmp_path, max_results=1)
+
+    assert result.ok
+    (stats,) = result.stats
+    assert stats.kept == 1
+    assert stats.complete is False
+
+
+def test_analysis_files_use_mode_specific_names(tmp_path):
+    history = _history()
+    cfg = RunConfig(
+        domains=["example.com"],
+        outdir=tmp_path,
+        write_files=True,
+        out_format="jsonl",
+        analysis="summary",
+    )
+    result = HistoryRunResult(
+        stats=[],
+        analyses={"example.com": history},
+    )
+
+    write_analysis_files(result, cfg, "summary")
+
+    path = tmp_path / "example.com.summary.jsonl"
+    assert path.is_file()
+    record = json.loads(path.read_text(encoding="utf-8").strip())
+    assert record["type"] == "summary"
+    assert record["unique_urls"] == 2

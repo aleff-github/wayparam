@@ -109,6 +109,24 @@ Example:
 wayparam -l domains.txt --quiet --stats
 ```
 
+### Historical analysis views
+
+The following flags are mutually exclusive:
+
+- `--history`: one record per normalized URL, with first/last seen, capture count, status-code counts and MIME-type counts
+- `--params`: one record per query-parameter name, with endpoint count, capture count and first/last seen
+- `--summary`: one aggregate record per domain
+
+Historical modes request `timestamp,statuscode,mimetype,original` from CDX and automatically disable `collapse=urlkey`, because collapsed results cannot provide correct capture counts or first/last-seen dates.
+
+```bash
+wayparam -d example.com --history --stdout --no-files --format jsonl
+wayparam -d example.com --params
+wayparam -d example.com --summary --format jsonl
+```
+
+Text output is tab-separated. JSONL output uses structured records. File output uses mode-specific names such as `example.com.history.jsonl` so normal URL results are never overwritten.
+
 ---
 
 ## Wayback / CDX query options
@@ -203,7 +221,9 @@ how much `auto` will pull in its probe before concluding the result spans pages.
 ### `--max-results N`
 Stop the whole run once this many URLs have been emitted. The budget is
 **global**, shared by every domain in the run, so with several domains whichever
-gets there first uses it up.
+gets there first uses it up. In `--history`, `--params` and `--summary` modes,
+the same option limits accepted capture rows before aggregation rather than the
+number of final aggregate records.
 
 **Default:** 0 (no cap)
 
