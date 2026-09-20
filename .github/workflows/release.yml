@@ -240,7 +240,26 @@ jobs:
           fi
 
           # ---- GitHub Release assets ---------------------------------------
-          assets="$(gh release view "$GITHUB_REF_NAME" --json assets -q '[.assets[].name] | join(" ")' 2>/dev/null || echo "")"
+          # Query the REST API directly and allow a short propagation window.
+          # `gh release view` can transiently return nothing immediately after
+          # another job creates the release/assets, which caused false failures.
+          release_assets() {
+            curl -sfS \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${GITHUB_REF_NAME}" \
+              | jq -r '[.assets[].name] | join(" ")'
+          }
+          assets=""
+          for _ in $(seq 12); do
+            assets="$(release_assets 2>/dev/null || true)"
+            if echo "$assets" | grep -q "wayparam_${version}-1_all.deb" \
+               && echo "$assets" | grep -q "wayparam-gui_${version}-1_all.deb"; then
+              break
+            fi
+            sleep 5
+          done
           if echo "$assets" | grep -q "wayparam_${version}-1_all.deb" \
              && echo "$assets" | grep -q "wayparam-gui_${version}-1_all.deb"; then
             note "GitHub Release (.deb)" "both packages attached" ":white_check_mark:"
