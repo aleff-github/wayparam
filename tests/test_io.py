@@ -8,7 +8,7 @@ import io
 
 import pytest
 
-from wayparam.io import ensure_dir, read_domains
+from wayparam.io import ensure_dir, normalize_domain, read_domains
 
 LIST = """
 # a comment
@@ -32,6 +32,25 @@ def test_read_domains_normalizes_and_dedupes(tmp_path):
         "plain.test",
         "spaced.test",
     ]
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("Example.com/path?q=1", "example.com"),
+        ("https://Example.com:8443/a", "example.com:8443"),
+        ("https://user:pass@Example.com/a", "example.com"),
+        ("[2001:DB8::1]/a", "[2001:db8::1]"),
+        ("https://[2001:DB8::1]:8443/a", "[2001:db8::1]:8443"),
+    ],
+)
+def test_normalize_domain(raw, expected):
+    assert normalize_domain(raw) == expected
+
+
+@pytest.mark.parametrize("raw", ["", "# comment", "https://", "example.com:not-a-port"])
+def test_normalize_domain_rejects_invalid_input(raw):
+    assert normalize_domain(raw) is None
 
 
 def test_read_domains_from_stdin(monkeypatch):

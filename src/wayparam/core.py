@@ -16,6 +16,7 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import quote
 
 import httpx
 
@@ -119,7 +120,11 @@ def fingerprint(url: str) -> int:
 
 
 def _outfile_for(outdir: Path, domain: str, out_format: str) -> Path:
-    return outdir / f"{domain}.{'jsonl' if out_format == 'jsonl' else 'txt'}"
+    # A target may include a port or a bracketed IPv6 literal. Characters such
+    # as ":" are legal in POSIX filenames but not on Windows, so encode only
+    # the filename-unsafe parts while keeping ordinary domains readable.
+    safe_domain = quote(domain, safe=".-_")
+    return outdir / f"{safe_domain}.{'jsonl' if out_format == 'jsonl' else 'txt'}"
 
 
 async def _process_domain(

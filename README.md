@@ -28,7 +28,7 @@ http://www.example.com/?format=FUZZ&retailerId=FUZZ
 - **Async + concurrency** for speed on multiple domains
 - **Rate limiting** (`--rps`) to be polite with Wayback/CDX
 - **Retry + backoff** and clearer error messages
-- **CDX pagination** (resumeKey) when available
+- **Lossless CDX pagination** with automatic block-mode fallback
 - Filters “boring” URLs by:
   - extension blacklist/whitelist
   - optional path regex exclusion
@@ -53,7 +53,7 @@ wayparam is officially available in the BlackArch Linux repository.
 
 ```bash
 sudo pacman -S wayparam
-````
+```
 
 On an existing Arch Linux installation with the BlackArch repository enabled, the same package can be installed directly with `pacman`.
 
@@ -103,8 +103,8 @@ It prints a URL containing a one-time token and opens it in your browser:
 wayparam UI: http://127.0.0.1:8765/?t=<token>
 ```
 
-It binds to **127.0.0.1 only**, requires that token on every request, and
-rejects unexpected `Host` headers — it performs outbound requests on behalf of
+It binds to **loopback only** (127.0.0.1 by default), requires that token on
+every request, and rejects unexpected `Host` headers — it performs outbound requests on behalf of
 whoever can reach it, so it is deliberately not reachable from the network. To
 use it on a remote box, forward the port instead:
 
@@ -123,7 +123,7 @@ python -m venv .venv
 # macOS/Linux: source .venv/bin/activate
 python -m pip install -U pip
 pip install -e .
-````
+```
 
 ### Development install (tests + lint)
 
@@ -257,7 +257,7 @@ wayparam -d example.com --stdout --no-files | sort -u > urls.txt
 
 ### Performance / network
 
-* `--max-results 500` (global cap on emitted URLs; `--limit` is only the CDX page size)
+* `--max-results 500` (global cap on emitted URLs; `--limit` / `--page-size` only control the CDX page size)
 * `--concurrency 8`
 * `--rps 1` (recommended when using VPNs / noisy networks)
 * `--timeout 30`

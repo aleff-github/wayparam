@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import math
 import os
 import re
 import sys
@@ -14,12 +15,52 @@ from . import __version__
 from .config import RunConfig, build_filter_options
 from .core import RunResult, run
 from .http import HttpConfig
-from .io import read_domains
+from .io import normalize_domain, read_domains
 from .normalize import NormalizeOptions
 from .output import UrlRecord, print_hint_stderr, print_record_stdout
 from .wayback import PAGINATION_MODES, CdxOptions
 
 log = logging.getLogger("wayparam")
+
+
+def _positive_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError("must be an integer") from None
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be greater than 0")
+    return parsed
+
+
+def _nonnegative_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError("must be an integer") from None
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("must be 0 or greater")
+    return parsed
+
+
+def _positive_float(value: str) -> float:
+    try:
+        parsed = float(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError("must be a number") from None
+    if not math.isfinite(parsed) or parsed <= 0:
+        raise argparse.ArgumentTypeError("must be a finite number greater than 0")
+    return parsed
+
+
+def _nonnegative_float(value: str) -> float:
+    try:
+        parsed = float(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError("must be a number") from None
+    if not math.isfinite(parsed) or parsed < 0:
+        raise argparse.ArgumentTypeError("must be a finite number 0 or greater")
+    return parsed
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -71,7 +112,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--limit",
-        type=int,
+        "--page-size",
+        dest="limit",
+        type=_positive_int,
         default=50000,
         help="CDX rows per request in resumeKey mode -- not a cap on results "
         "(default: 50000). Use --max-results to bound a run.",
@@ -87,14 +130,14 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--block-size",
-        type=int,
+        type=_positive_int,
         default=100,
         help="CDX index blocks per request in block mode (default: 100). Larger means "
         "fewer but slower and heavier responses.",
     )
     p.add_argument(
         "--max-results",
-        type=int,
+        type=_nonnegative_int,
         default=0,
         help="Stop the whole run after this many URLs (0 = no cap).",
     )
@@ -138,17 +181,25 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
 
     # Performance/network
-    p.add_argument("--concurrency", type=int, default=6, help="Concurrent domains (default: 6).")
+    p.add_argument(
+        "--concurrency",
+        type=_positive_int,
+        default=6,
+        help="Concurrent domains (default: 6).",
+    )
     p.add_argument(
         "--rps",
-        type=float,
+        type=_nonnegative_float,
         default=0.0,
         help="Global requests-per-second to Wayback (0 = unlimited).",
     )
     p.add_argument(
-        "--timeout", type=float, default=30.0, help="HTTP timeout seconds (default: 30)."
+        "--timeout",
+        type=_positive_float,
+        default=30.0,
+        help="HTTP timeout seconds (default: 30).",
     )
-    p.add_argument("--retries", type=int, default=4, help="HTTP retries (default: 4).")
+    p.add_argument("--retries", type=_nonnegative_int, default=4, help="HTTP retries (default: 4).")
     p.add_argument("--proxy", default=None, help="HTTP proxy URL (e.g. http://127.0.0.1:8080).")
     p.add_argument("--user-agent", default=None, help="Override User-Agent.")
     p.add_argument(
@@ -218,7 +269,11 @@ def _maybe_print_wayback_vpn_hint(exc: Exception) -> None:
 
 def build_config(args: argparse.Namespace) -> RunConfig:
     """Translate parsed CLI arguments into a frontend-independent RunConfig."""
-    domains = [args.domain.strip().lower()] if args.domain else read_domains(args.list)
+    if args.domain:
+        domain = normalize_domain(args.domain)
+        domains = [domain] if domain else []
+    else:
+        domains = read_domains(args.list)
 
     return RunConfig(
         domains=domains,

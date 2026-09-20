@@ -4,22 +4,23 @@ wayparam is intentionally modular. Each module has a single responsibility, whic
 
 ## High-level data flow
 
-1. **cli.py**
-   - Parses args
-   - Builds option objects
-   - Orchestrates concurrency
-2. **wayback.py**
+1. **cli.py / gui/**
+   - Parse user input
+   - Build a frontend-independent RunConfig
+2. **core.py**
+   - Orchestrates concurrency, filtering, normalization, deduplication and output
+3. **wayback.py**
    - Builds CDX query parameters
    - Handles pagination/resumeKey
-3. **http.py**
+4. **http.py**
    - Makes resilient HTTP requests (retries, backoff)
-4. **filters.py**
+5. **filters.py**
    - Drops “boring” URLs (static assets) early
-5. **normalize.py**
+6. **normalize.py**
    - Canonicalizes and normalizes URLs (stable output)
-6. **output.py**
+7. **output.py**
    - Writes records to files and/or stdout (txt/jsonl)
-7. **ratelimit.py**
+8. **ratelimit.py**
    - Global RPS limiter (optional)
 
 ## Why this structure matters

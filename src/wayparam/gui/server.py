@@ -19,6 +19,7 @@ import http.server
 import json
 import logging
 import secrets
+import socket
 import sys
 import threading
 from pathlib import Path
@@ -28,6 +29,7 @@ from .. import __version__
 from ..config import RunConfig, build_filter_options
 from ..core import run
 from ..http import HttpConfig
+from ..io import parse_domains
 from ..normalize import NormalizeOptions
 from ..output import UrlRecord
 from ..wayback import CdxOptions
@@ -53,12 +55,7 @@ def config_from_request(data: dict) -> RunConfig:
     Every field is optional and falls back to the same defaults as the CLI.
     """
     raw_domains = str(data.get("domains", ""))
-    domains = [
-        d.strip().lower().removeprefix("http://").removeprefix("https://").split("/")[0]
-        for d in raw_domains.replace(",", "\n").splitlines()
-        if d.strip() and not d.strip().startswith("#")
-    ]
-    domains = list(dict.fromkeys(d for d in domains if d))
+    domains = parse_domains(raw_domains.replace(",", "\n").splitlines())
     if not domains:
         raise Rejected(400, "No domain given.")
 
@@ -268,6 +265,12 @@ def is_client_gone(exc: BaseException | None) -> bool:
     return isinstance(exc, (BrokenPipeError, ConnectionResetError, TimeoutError))
 
 
+def format_http_authority(host: str, port: int) -> str:
+    """Format host:port for an HTTP URL/Host header, including IPv6 brackets."""
+    display_host = f"[{host}]" if ":" in host and not host.startswith("[") else host
+    return f"{display_host}:{port}"
+
+
 class Server(http.server.ThreadingHTTPServer):
     daemon_threads = True
 
@@ -285,7 +288,11 @@ class Server(http.server.ThreadingHTTPServer):
         super().handle_error(request, client_address)
 
 
-def serve(host: str = "127.0.0.1", port: int = 8765) -> tuple[http.server.ThreadingHTTPServer, str]:
+class IPv6Server(Server):
+    address_family = socket.AF_INET6
+
+
+def serve(host: str = "127.0.0.1", port: int = 8765) -> tuple[Server, str]:
     """Start the server and return it together with its one-time token."""
     token = secrets.token_urlsafe(24)
 
@@ -294,10 +301,16 @@ def serve(host: str = "127.0.0.1", port: int = 8765) -> tuple[http.server.Thread
 
     Bound.token = token
 
-    httpd = Server((host, port), Bound)
+    server_cls = IPv6Server if ":" in host else Server
+    httpd = server_cls((host, port), Bound)
     bound_port = httpd.server_address[1]
     Bound.allowed_hosts = frozenset(
-        {f"{host}:{bound_port}", f"localhost:{bound_port}", f"127.0.0.1:{bound_port}"}
+        {
+            format_http_authority(host, bound_port).lower(),
+            format_http_authority("localhost", bound_port),
+            format_http_authority("127.0.0.1", bound_port),
+            format_http_authority("::1", bound_port),
+        }
     )
 
     threading.Thread(target=httpd.serve_forever, name="wayparam-gui", daemon=True).start()

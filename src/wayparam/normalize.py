@@ -52,26 +52,26 @@ def canonicalize_url(url: str, opt: NormalizeOptions) -> str | None:
     - optionally drops tracking params
     - optionally masks values
     """
-    parts = urlsplit(url.strip())
+    try:
+        parts = urlsplit(url.strip())
+        host = parts.hostname
+        port = parts.port
+    except ValueError:
+        return None
 
-    if not parts.scheme or not parts.netloc:
+    if not parts.scheme or not parts.netloc or not host:
         return None
 
     scheme = parts.scheme.lower()
 
-    netloc = parts.netloc
-    if "@" in netloc:
-        userinfo, hostport = netloc.rsplit("@", 1)
-    else:
-        userinfo, hostport = "", netloc
-
-    host, sep, port = hostport.partition(":")
+    # urllib.parse already separates bracketed IPv6 literals from ports.
+    # Splitting netloc on ":" breaks because ":" is part of an IPv6 host.
     host = host.lower()
-    if port.isdigit() and (scheme, int(port)) in _DEFAULT_PORTS:
-        hostport_norm = host
-    else:
-        hostport_norm = host + (sep + port if sep else "")
+    hostport_norm = f"[{host}]" if ":" in host else host
+    if port is not None and (scheme, port) not in _DEFAULT_PORTS:
+        hostport_norm += f":{port}"
 
+    userinfo = parts.netloc.rsplit("@", 1)[0] if "@" in parts.netloc else ""
     netloc_norm = (userinfo + "@" if userinfo else "") + hostport_norm
 
     path = parts.path or "/"

@@ -8,6 +8,7 @@ import pytest
 
 from wayparam import __version__
 from wayparam.gui import build_arg_parser, main
+from wayparam.gui.server import format_http_authority
 
 
 def test_defaults_are_loopback_only():
@@ -45,3 +46,8 @@ def test_version_flag(capsys):
         build_arg_parser().parse_args(["--version"])
     assert e.value.code == 0
     assert __version__ in capsys.readouterr().out
+
+
+def test_ipv6_authority_is_bracketed():
+    assert format_http_authority("::1", 8765) == "[::1]:8765"
+    assert format_http_authority("127.0.0.1", 8765) == "127.0.0.1:8765"

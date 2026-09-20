@@ -8,16 +8,22 @@ This page explains how each module works and how they interact.
 
 Responsibilities:
 - define the public CLI contract (argparse)
-- validate option interactions (`--no-files` requires `--stdout`)
-- configure concurrency (asyncio semaphore)
-- coordinate per-domain processing and aggregate results
+- validate CLI option interactions and numeric bounds
+- normalize CLI inputs and build a frontend-independent `RunConfig`
 
-### Per-domain processing
-For each raw URL returned by CDX:
-1) filter boring URLs (`filters.is_boring`)
-2) canonicalize (`normalize.canonicalize_url`)
-3) filter again (canonicalized URL may reveal a static extension)
-4) deduplicate and emit output (`output.write_record` / `output.print_record_stdout`)
+The optional web UI builds the same `RunConfig`; neither frontend owns the
+engine.
+
+---
+
+## `wayparam.core`
+
+`core.run()` owns concurrency and per-domain orchestration. For each raw URL
+returned by CDX it:
+1) filters boring URLs (`filters.is_boring`)
+2) canonicalizes (`normalize.canonicalize_url`)
+3) deduplicates the normalized result
+4) emits output and progress callbacks
 
 ---
 
@@ -38,7 +44,7 @@ The resumeKey walk itself is faithful, but the server-side `collapse` is not:
 while collapsing, the API drops one row at every page boundary. Measured on the
 live API, paging one query 18 ways lost 15 of 4684 URLs.
 
-### Block paging (the default)
+### Block paging (used by `auto` for multi-page results)
 `showNumPages` + `page`/`pageSize` walks the *index* in fixed blocks instead,
 and is lossless with `collapse`. Two things about it are easy to get wrong:
 

@@ -28,6 +28,11 @@ def test_domains_are_cleaned_and_deduped():
     assert cfg.domains == ["example.com", "foo.org", "bar.org"]
 
 
+def test_domains_use_the_shared_ipv6_safe_parser():
+    cfg = config_from_request({"domains": "https://[2001:DB8::1]:8443/a, https://Example.com/path"})
+    assert cfg.domains == ["[2001:db8::1]:8443", "example.com"]
+
+
 def test_no_domain_is_rejected():
     with pytest.raises(Rejected) as e:
         config_from_request({"domains": "  \n# only a comment\n"})

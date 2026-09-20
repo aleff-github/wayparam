@@ -35,3 +35,21 @@ def test_distinct_values_survive_when_values_are_kept():
     assert canonicalize_url("https://example.com/p?t=a&t=b&t=a", opt) == (
         "https://example.com/p?t=a&t=b"
     )
+
+
+def test_canonicalize_supports_ipv6_and_drops_default_port():
+    opt = NormalizeOptions(drop_tracking=False)
+    assert canonicalize_url("https://[2001:DB8::1]:443/p?id=1", opt) == (
+        "https://[2001:db8::1]/p?id=FUZZ"
+    )
+
+
+def test_canonicalize_keeps_non_default_ipv6_port():
+    opt = NormalizeOptions(drop_tracking=False)
+    assert canonicalize_url("https://[2001:DB8::1]:8443/p?id=1", opt) == (
+        "https://[2001:db8::1]:8443/p?id=FUZZ"
+    )
+
+
+def test_canonicalize_rejects_an_invalid_port():
+    assert canonicalize_url("https://example.com:not-a-port/?id=1", NormalizeOptions()) is None
