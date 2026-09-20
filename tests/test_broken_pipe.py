@@ -98,16 +98,37 @@ def test_pagination_defaults_to_the_lossless_mode():
     assert cfg.cdx.block_size == 100
 
 
-def test_an_unusable_block_size_is_clamped():
+def test_page_size_is_an_alias_for_limit():
     parser = cli.build_arg_parser()
-    cfg = cli.build_config(parser.parse_args(["-d", "example.com", "--block-size", "0"]))
-    assert cfg.cdx.block_size == 1
+    cfg = cli.build_config(parser.parse_args(["-d", "example.com", "--page-size", "321"]))
+    assert cfg.cdx.limit == 321
 
 
-def test_a_negative_max_results_means_unlimited():
+@pytest.mark.parametrize(
+    ("option", "value"),
+    [
+        ("--limit", "0"),
+        ("--block-size", "0"),
+        ("--max-results", "-1"),
+        ("--concurrency", "0"),
+        ("--rps", "-0.1"),
+        ("--timeout", "0"),
+        ("--retries", "-1"),
+    ],
+)
+def test_invalid_numeric_options_are_usage_errors(option, value):
     parser = cli.build_arg_parser()
-    cfg = cli.build_config(parser.parse_args(["-d", "example.com", "--max-results", "-5"]))
-    assert cfg.max_results == 0
+    with pytest.raises(SystemExit) as exc:
+        parser.parse_args(["-d", "example.com", option, value])
+    assert exc.value.code == 2
+
+
+def test_single_domain_uses_the_same_normalizer_as_domain_lists():
+    parser = cli.build_arg_parser()
+    cfg = cli.build_config(
+        parser.parse_args(["-d", "https://Example.com:8443/some/path?ignored=1"])
+    )
+    assert cfg.domains == ["example.com:8443"]
 
 
 def test_exit_code_is_2_when_a_domain_failed_even_with_partial_stats(monkeypatch, capsys):

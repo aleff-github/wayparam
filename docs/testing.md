@@ -19,6 +19,7 @@ pytest -q --cov=wayparam --cov-report=term-missing   # with coverage
 - URL normalization behavior
 - extension parsing and boring URL detection (blacklist and whitelist modes)
 - resumeKey splitting logic
+- shared target parsing for CLI/list/GUI inputs, including bracketed IPv6
 - domain-list parsing (`-l`, including `-` for stdin)
 - the rate limiter, on a fake clock rather than wall time
 
@@ -36,8 +37,9 @@ an ephemeral loopback port. The streamed NDJSON run is tested by replacing
 ## What CI enforces
 - `ruff check` and `ruff format --check`
 - `mypy src/wayparam`
-- the suite on Python 3.9 through 3.14 — `requires-python` is `>=3.9`, so the
-  matrix is what actually proves the floor
+- the suite on Python 3.9 through 3.14 on Linux — `requires-python` is `>=3.9`,
+  so the matrix is what actually proves the floor
+- an additional Python 3.13 smoke run on Linux, Windows and macOS
 - a coverage floor (`--cov-fail-under`), meant to ratchet upwards only
 
 ## Adding new tests

@@ -203,8 +203,8 @@ async def _iter_resume(
             # boundary. --pagination blocks does not have this problem.
             log.warning(
                 "%s: resumeKey paging with collapse=%s drops one URL per page boundary. "
-                "Use --pagination blocks (the default) or --no-collapse for a complete "
-                "result set.",
+                "Use --pagination blocks, leave --pagination auto (the default), "
+                "or use --no-collapse for a complete result set.",
                 domain,
                 opt.collapse,
             )

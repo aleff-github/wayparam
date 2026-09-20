@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+- Added `--page-size` as the documented alias for `--limit`
+- Reject invalid negative/zero CLI numeric settings before a run starts
+- Unified domain/URL input normalization across `-d`, `-l` and the web UI
+- Fixed IPv6 URL canonicalization and bracketed IPv6 handling in the local web UI
+- Percent-encode filename-unsafe target characters so hosts with ports work on Windows
+- Corrected the pagination warning to identify `auto` as the default mode
+- Added Linux/Windows/macOS CI smoke tests on Python 3.13
+- Updated checkout/setup-python workflows to their Node 24-based major versions
+- CI now cancels stale runs when a newer commit supersedes the same branch
+- Release builds now run `twine check` and smoke-test the built wheel before PyPI upload
+- Expanded security reporting and contribution guidance
+
 ## 0.4.0
 - Added an optional local web interface (`wayparam-gui`), shipped as a separate Debian package and as the `wayparam.gui` snap app
 - Added `--version` to the CLI

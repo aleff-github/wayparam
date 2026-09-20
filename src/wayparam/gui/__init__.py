@@ -11,7 +11,7 @@ import threading
 import webbrowser
 
 from .. import __version__
-from .server import serve
+from .server import format_http_authority, serve
 
 log = logging.getLogger("wayparam.gui")
 
@@ -67,7 +67,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Cannot listen on {args.host}:{args.port}: {exc}", file=sys.stderr)
         return 1
 
-    url = f"http://{args.host}:{httpd.server_address[1]}/?t={token}"
+    authority = format_http_authority(args.host, httpd.server_address[1])
+    url = f"http://{authority}/?t={token}"
     print(f"wayparam UI: {url}", file=sys.stderr)
     print("The token in that URL is required; press Ctrl+C to stop.", file=sys.stderr)
 

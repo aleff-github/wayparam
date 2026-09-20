@@ -307,3 +307,10 @@ def test_the_cdx_iterator_is_closed_when_the_consumer_goes_away(tmp_path, monkey
         _run(_cfg(tmp_path, write_files=False), on_record=boom)
 
     assert state["client_still_open"] is True
+
+
+def test_output_filename_is_portable_for_ports_and_ipv6(tmp_path):
+    assert core._outfile_for(tmp_path, "example.com:8443", "txt").name == ("example.com%3A8443.txt")
+    assert core._outfile_for(tmp_path, "[2001:db8::1]:8443", "jsonl").name == (
+        "%5B2001%3Adb8%3A%3A1%5D%3A8443.jsonl"
+    )

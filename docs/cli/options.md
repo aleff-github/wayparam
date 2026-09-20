@@ -193,8 +193,8 @@ Larger values mean fewer requests but slower, heavier responses, and the first
 results only appear once one arrives — a single block page can be tens of
 megabytes. Smaller values stream sooner at the cost of more requests.
 
-### `--limit N`
-How many CDX rows to ask for per request **in `resume` mode**. This is a page
+### `--limit N`, `--page-size N`
+These are aliases. They control how many CDX rows to ask for per request **in `resume` mode**. This is a page
 size, not a cap on results; use `--max-results` to bound a run. It also decides
 how much `auto` will pull in its probe before concluding the result spans pages.
 
@@ -319,7 +319,7 @@ wayparam -d example.com --exclude-path-regex "^/static/" --exclude-path-regex "^
 ## Performance & network options
 
 ### `--concurrency N`
-Number of domains processed concurrently.
+Number of domains processed concurrently. Must be greater than 0.
 
 **Default:** `6`
 
@@ -329,7 +329,7 @@ wayparam -l domains.txt --concurrency 10
 ```
 
 ### `--rps FLOAT`
-Global requests-per-second limit to the Wayback CDX API.
+Global requests-per-second limit to the Wayback CDX API. Must be 0 or greater.
 
 **Default:** `0` (unlimited)
 
@@ -339,7 +339,7 @@ wayparam -d example.com --rps 1
 ```
 
 ### `--timeout SECONDS`
-HTTP timeout.
+HTTP timeout. Must be greater than 0.
 
 **Default:** `30`
 
@@ -349,7 +349,7 @@ wayparam -d example.com --timeout 10
 ```
 
 ### `--retries N`
-Number of retry attempts on transient failures.
+Number of retry attempts on transient failures. Must be 0 or greater.
 
 **Default:** `4`
 
@@ -371,7 +371,7 @@ wayparam -d example.com --proxy http://127.0.0.1:8080
 ### `--user-agent STR`
 Override the User-Agent header.
 
-**Default:** unset (httpx will use its default User-Agent unless overridden)
+**Default:** a browser-like User-Agent selected once per process
 
 Example:
 ```bash
