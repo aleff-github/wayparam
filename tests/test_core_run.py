@@ -15,6 +15,7 @@ import pytest
 from wayparam import core
 from wayparam.config import RunConfig, build_filter_options
 from wayparam.http import HttpConfig
+from wayparam.providers.base import SourceRecord
 
 PAGE = "\n".join(
     [
@@ -258,28 +259,35 @@ def test_dedup_survives_urls_that_are_not_ascii(tmp_path):
     assert len(seen) == 2
 
 
-def test_the_cdx_iterator_is_closed_while_the_client_is_still_open(tmp_path, monkeypatch):
-    """Regression: an early exit left the generator suspended.
+class _FakeProvider:
+    def __init__(self, name, urls, *, fail=None, state=None):
+        self.name = name
+        self.urls = urls
+        self.fail = fail
+        self.state = state
 
-    It was then finalised at event-loop shutdown -- by which point the httpx
-    client it streams from had already been closed -- and the teardown failed
-    with 'aclose(): asynchronous generator is already running'. Only a real
-    connection pool shows the symptom, so pin the invariant instead: the
-    iterator must be closed while the client is still usable.
-    """
-    state: dict[str, bool] = {}
-
-    async def fake_iter(domain, *, client, http_config, rate_limiter, opt):
+    async def iter_urls(self, domain, *, client):
         try:
-            for i in range(100):
-                yield f"https://example.com/p{i}?a=1"
+            for url in self.urls:
+                yield SourceRecord(original=url, source=self.name)
+            if self.fail is not None:
+                raise self.fail
         finally:
-            state["client_still_open"] = not client.is_closed
+            if self.state is not None:
+                self.state["client_still_open"] = not client.is_closed
 
-    monkeypatch.setattr(core, "iter_original_urls", fake_iter)
+
+def test_provider_iterator_is_closed_while_the_client_is_still_open(tmp_path, monkeypatch):
+    """An early budget stop must close the active source before the client."""
+    state: dict[str, bool] = {}
+    provider = _FakeProvider(
+        "wayback",
+        [f"https://example.com/p{i}?a=1" for i in range(100)],
+        state=state,
+    )
+    monkeypatch.setattr(core, "build_providers", lambda _cfg: [provider])
 
     seen = []
-    # The budget stops the walk long before the iterator runs out.
     result = _run(_cfg(tmp_path, write_files=False, max_results=2), on_record=seen.append)
 
     assert len(seen) == 2
@@ -287,18 +295,15 @@ def test_the_cdx_iterator_is_closed_while_the_client_is_still_open(tmp_path, mon
     assert state["client_still_open"] is True
 
 
-def test_the_cdx_iterator_is_closed_when_the_consumer_goes_away(tmp_path, monkeypatch):
-    """The same has to hold when a closed pipe unwinds the run."""
+def test_provider_iterator_is_closed_when_the_consumer_goes_away(tmp_path, monkeypatch):
+    """The same invariant holds when a closed pipe unwinds the whole run."""
     state: dict[str, bool] = {}
-
-    async def fake_iter(domain, *, client, http_config, rate_limiter, opt):
-        try:
-            for i in range(100):
-                yield f"https://example.com/p{i}?a=1"
-        finally:
-            state["client_still_open"] = not client.is_closed
-
-    monkeypatch.setattr(core, "iter_original_urls", fake_iter)
+    provider = _FakeProvider(
+        "wayback",
+        [f"https://example.com/p{i}?a=1" for i in range(100)],
+        state=state,
+    )
+    monkeypatch.setattr(core, "build_providers", lambda _cfg: [provider])
 
     def boom(_rec):
         raise BrokenPipeError(32, "Broken pipe")
@@ -314,3 +319,70 @@ def test_output_filename_is_portable_for_ports_and_ipv6(tmp_path):
     assert core._outfile_for(tmp_path, "[2001:db8::1]:8443", "jsonl").name == (
         "%5B2001%3Adb8%3A%3A1%5D%3A8443.jsonl"
     )
+
+
+def test_multi_source_deduplicates_across_providers_in_source_order(tmp_path, monkeypatch):
+    providers = [
+        _FakeProvider(
+            "wayback",
+            [
+                "https://example.com/a?id=1",
+                "https://example.com/shared?q=one",
+            ],
+        ),
+        _FakeProvider(
+            "commoncrawl",
+            [
+                "https://example.com/shared?q=two",
+                "https://example.com/b?id=2",
+            ],
+        ),
+    ]
+    monkeypatch.setattr(core, "build_providers", lambda _cfg: providers)
+
+    seen = []
+    result = _run(
+        _cfg(
+            tmp_path,
+            write_files=False,
+            sources=("wayback", "commoncrawl"),
+        ),
+        on_record=seen.append,
+    )
+
+    assert result.ok
+    assert [(record.url, record.source) for record in seen] == [
+        ("https://example.com/a?id=FUZZ", "wayback"),
+        ("https://example.com/shared?q=FUZZ", "wayback"),
+        ("https://example.com/b?id=FUZZ", "commoncrawl"),
+    ]
+    assert result.stats[0].fetched == 4
+    assert result.stats[0].kept == 3
+
+
+def test_one_source_can_fail_without_discarding_other_source_results(tmp_path, monkeypatch):
+    providers = [
+        _FakeProvider(
+            "wayback",
+            ["https://example.com/a?id=1"],
+            fail=RuntimeError("archive unavailable"),
+        ),
+        _FakeProvider("commoncrawl", ["https://example.com/b?id=2"]),
+    ]
+    monkeypatch.setattr(core, "build_providers", lambda _cfg: providers)
+
+    seen = []
+    result = _run(
+        _cfg(
+            tmp_path,
+            write_files=False,
+            sources=("wayback", "commoncrawl"),
+        ),
+        on_record=seen.append,
+    )
+
+    assert not result.ok
+    assert [record.source for record in seen] == ["wayback", "commoncrawl"]
+    assert result.stats[0].kept == 2
+    assert result.stats[0].complete is False
+    assert "wayback: archive unavailable" in str(result.errors[0][1])

@@ -16,6 +16,7 @@ wayparam implements this goal with:
 - canonicalization and stable, deduplicated output
 - pipeline-friendly stdout/stderr separation
 - capture-level historical analysis for endpoints and query parameters
+- ordered multi-source collection from Wayback and Common Crawl
 
 ## What you get
 
@@ -24,5 +25,6 @@ wayparam implements this goal with:
 - Output formats: `txt` or `jsonl`
 - Clear diagnostics and hints (e.g., VPN/proxy blocks) **on stderr**
 - Historical views for first/last seen, capture counts, status/MIME distributions and parameter prevalence
+- Common Crawl CDXJ collection with latest-index discovery or pinned crawl IDs
 
 Continue with **Quickstart** to install and run your first command.

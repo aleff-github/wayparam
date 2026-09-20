@@ -1,6 +1,6 @@
 .TH WAYPARAM 1 "September 2026" "wayparam 0.5.0" "User Commands"
 .SH NAME
-wayparam \- fetch and normalize parameterized URLs from the Wayback CDX API
+wayparam \- fetch and normalize parameterized URLs from public web archive indexes
 .SH SYNOPSIS
 .B wayparam
 .RI [ options ] " -d DOMAIN"
@@ -9,16 +9,17 @@ wayparam \- fetch and normalize parameterized URLs from the Wayback CDX API
 .RI [ options ] " -l FILE"
 .SH DESCRIPTION
 .B wayparam
-queries the Internet Archive Wayback Machine CDX API to retrieve historical URLs for a host
+queries public web archive indexes to retrieve historical URLs for a host
 (or a list of hosts), filters out common static/boring URLs, and outputs normalized URLs
-that contain query parameters.
+that contain query parameters. Wayback is the default source; Common Crawl can be
+selected alone or combined with Wayback.
 
 By default, query parameter values are replaced with a placeholder (default:
 .BR FUZZ ),
 making the output suitable for sharing and fuzzing workflows.
 
-The tool is intended for OSINT-style URL collection. It does not crawl targets and only queries
-the Wayback CDX API.
+The tool is intended for OSINT-style URL collection. It does not crawl targets; it queries
+archive indexes only.
 .SH OUTPUT BEHAVIOR
 Diagnostics (logs, hints, stats) are written to
 .BR stderr .
@@ -44,6 +45,34 @@ Query a single domain/host (e.g.
 Read domains/hosts from a file (one per line). Use
 .B \-
 to read from stdin.
+.SS Archive Sources
+.TP
+.BR \-\-source " " \fINAME[,NAME...]R
+Archive provider(s) in priority order. Supported values are
+.B wayback
+and
+.B commoncrawl
+(default:
+.BR wayback ).
+Normalized URLs are deduplicated across providers.
+.TP
+.BR \-\-cc\-index " " \fIIDR
+Common Crawl crawl index ID. Repeat or use comma-separated IDs to query several
+collections. The default is
+.BR latest ,
+resolved from Common Crawl collection metadata.
+.TP
+.BR \-\-cc\-page\-size " " \fINR
+Compressed Common Crawl ZipNum index blocks per page (default: 5). This is not a
+row count.
+.TP
+.BR \-\-cc\-rps " " \fIFLOATR
+Common Crawl index requests per second (default: 1). Requests to Common Crawl
+are also serialized within a run.
+.TP
+.BR \-\-cc\-filter " " \fIFILTERR
+Add a Common Crawl CDXJ filter (repeatable), for example
+.IR status:200 .
 .SS Output
 .TP
 .BR \-o ", " \-\-outdir " " \fIDIR\fR
@@ -91,10 +120,12 @@ count, represented captures and first/last seen timestamps.
 .BR \-\-summary
 Emit one historical aggregate record per domain.
 .PP
-Historical modes automatically disable CDX collapse so capture counts and
+Historical modes currently require
+.BR "--source wayback" .
+They automatically disable Wayback CDX collapse so capture counts and
 first/last-seen dates are meaningful. This may transfer substantially more data
 than a normal URL run.
-.SS Wayback / CDX
+.SS Shared Archive Query
 .TP
 .BR \-\-include\-subdomains
 Include subdomains by using CDX matchType=domain (default: host only).
@@ -109,7 +140,8 @@ or
 Only include captures up to this timestamp/year.
 .TP
 .BR \-\-no\-collapse
-Disable CDX collapse=urlkey (returns more duplicates and more data).
+Disable archive-index collapse=urlkey (returns more duplicates and more data).
+.SS Wayback / CDX
 .TP
 .BR \-\-pagination " " \fIauto|blocks|resume\fR
 How to walk a result that does not fit in one response (default: auto). The CDX
@@ -127,7 +159,7 @@ CDX index blocks per request in block mode (default: 100). Larger means fewer
 but slower and heavier responses.
 .TP
 .BR \-\-filter " " \fIFILTER\fR
-Add a CDX filter string (repeatable). Example:
+Add a Wayback CDX filter string (repeatable). Example:
 .IR statuscode:200 .
 .TP
 .BR \-\-limit ", " \-\-page\-size " " \fIN\fR
@@ -185,6 +217,8 @@ HTTP retry attempts (default: 4).
 .BR \-\-proxy " " \fIURL\fR
 HTTP proxy URL (e.g.
 .IR http://127.0.0.1:8080 ).
+When Common Crawl is selected, wayparam warns because its public-index guidance
+advises against proxy networks.
 .TP
 .BR \-\-user\-agent " " \fISTR\fR
 Override the User-Agent header.
@@ -225,6 +259,22 @@ Be polite to the Wayback API:
 .RS
 .nf
 wayparam -d example.com --rps 1 --concurrency 2
+.fi
+.RE
+.PP
+Query the latest Common Crawl index:
+.PP
+.RS
+.nf
+wayparam -d example.com --source commoncrawl
+.fi
+.RE
+.PP
+Combine Wayback and Common Crawl, deduplicating in that order:
+.PP
+.RS
+.nf
+wayparam -d example.com --source wayback,commoncrawl --format jsonl
 .fi
 .RE
 .PP
@@ -276,10 +326,11 @@ Output pipe closed by the consumer (for example
 .BR "wayparam -d example.com --stdout | head" ).
 This is normal in pipelines and is reported quietly.
 .SH NOTES
-If requests to the CDX endpoint consistently fail after retries, a VPN/proxy exit node may be blocked or
-rate-limited by
+If Wayback requests consistently fail after retries, a VPN/proxy exit node may
+be blocked or rate-limited by
 .IR web.archive.org .
-Try disconnecting the VPN/proxy or switching to a different exit node.
+Common Crawl's public index is also rate-limited; wayparam serializes those
+requests and defaults to one request per second.
 .SH SEE ALSO
 .BR curl (1),
 .BR jq (1)

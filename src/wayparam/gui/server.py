@@ -34,6 +34,7 @@ from ..http import HttpConfig
 from ..io import parse_domains
 from ..normalize import NormalizeOptions
 from ..output import UrlRecord
+from ..providers import CommonCrawlOptions, parse_source_names
 from ..wayback import CdxOptions
 
 log = logging.getLogger("wayparam.gui")
@@ -61,6 +62,11 @@ def config_from_request(data: dict) -> RunConfig:
     if not domains:
         raise Rejected(400, "No domain given.")
 
+    try:
+        sources = parse_source_names(str(data.get("source", "wayback")))
+    except ValueError as exc:
+        raise Rejected(400, str(exc)) from None
+
     outdir = str(data.get("outdir", "") or "").strip()
     write_files = bool(outdir)
     raw_analysis = str(data.get("analysis", "") or "").strip()
@@ -68,6 +74,8 @@ def config_from_request(data: dict) -> RunConfig:
         Optional[AnalysisMode],
         raw_analysis if raw_analysis in ("history", "params", "summary") else None,
     )
+    if analysis and sources != ("wayback",):
+        raise Rejected(400, "Historical analysis currently supports Wayback only.")
 
     def _int(key: str, default: int, lo: int, hi: int) -> int:
         try:
@@ -86,6 +94,7 @@ def config_from_request(data: dict) -> RunConfig:
 
     return RunConfig(
         domains=domains,
+        sources=sources,
         outdir=Path(outdir) if write_files else Path("results"),
         write_files=write_files,
         out_format="jsonl" if data.get("format") == "jsonl" else "txt",
@@ -103,6 +112,16 @@ def config_from_request(data: dict) -> RunConfig:
             from_ts=(str(data.get("from_ts") or "").strip() or None),
             to_ts=(str(data.get("to_ts") or "").strip() or None),
             limit=_int("limit", 50000, 1, 200000),
+        ),
+        commoncrawl=CommonCrawlOptions(
+            indexes=tuple(
+                item.strip()
+                for item in str(data.get("cc_index", "latest")).split(",")
+                if item.strip()
+            )
+            or ("latest",),
+            page_size=_int("cc_page_size", 5, 1, 100),
+            rps=_float("cc_rps", 1.0, 0.0, 100.0),
         ),
         normalize=NormalizeOptions(
             placeholder=str(data.get("placeholder") or "FUZZ"),
@@ -234,10 +253,24 @@ class Handler(http.server.BaseHTTPRequestHandler):
             # A write failure here means the browser navigated away or pressed
             # stop. core.run lets BrokenPipeError through, which unwinds the
             # whole run -- the same mechanism that makes `| head` work.
-            chunk({"type": "url", "domain": rec.domain, "url": rec.url})
+            chunk(
+                {
+                    "type": "url",
+                    "domain": rec.domain,
+                    "url": rec.url,
+                    "source": rec.source,
+                }
+            )
 
         try:
-            chunk({"type": "start", "domains": cfg.domains, "analysis": cfg.analysis})
+            chunk(
+                {
+                    "type": "start",
+                    "domains": cfg.domains,
+                    "sources": list(cfg.sources),
+                    "analysis": cfg.analysis,
+                }
+            )
             if cfg.analysis:
                 history_result = asyncio.run(run_history(cfg))
                 write_analysis_files(history_result, cfg, cfg.analysis)

@@ -17,6 +17,7 @@ from .filters import DEFAULT_EXT_BLACKLIST, FilterOptions, parse_ext_set
 from .http import HttpConfig
 from .normalize import NormalizeOptions
 from .output import OutputFormat
+from .providers import CommonCrawlOptions, SourceName
 from .wayback import CdxOptions
 
 AnalysisMode = Literal["history", "params", "summary"]
@@ -25,6 +26,7 @@ AnalysisMode = Literal["history", "params", "summary"]
 @dataclass(frozen=True)
 class RunConfig:
     domains: list[str]
+    sources: tuple[SourceName, ...] = ("wayback",)
     outdir: Path = Path("results")
     write_files: bool = True
     out_format: OutputFormat = "txt"
@@ -35,6 +37,7 @@ class RunConfig:
     rps: float = 0.0
     http: HttpConfig = field(default_factory=HttpConfig)
     cdx: CdxOptions = field(default_factory=CdxOptions)
+    commoncrawl: CommonCrawlOptions = field(default_factory=CommonCrawlOptions)
     normalize: NormalizeOptions = field(default_factory=NormalizeOptions)
     filters: FilterOptions = field(
         default_factory=lambda: FilterOptions(ext_blacklist=set(DEFAULT_EXT_BLACKLIST))

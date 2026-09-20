@@ -8,6 +8,7 @@ nav:
   - Home: index.md
   - Quickstart: quickstart.md
   - Historical intelligence: historical-analysis.md
+  - Archive sources: sources.md
   - CLI:
       - Overview: cli/overview.md
       - Options (complete): cli/options.md

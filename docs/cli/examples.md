@@ -67,6 +67,37 @@ wayparam -l domains.txt --rps 1 --concurrency 2
 
 ---
 
+## Common Crawl latest index
+
+```bash
+wayparam -d example.com --source commoncrawl
+```
+
+Common Crawl requests are serialized and default to one request per second.
+
+## Pin one or more Common Crawl crawls
+
+```bash
+wayparam -d example.com --source commoncrawl \
+  --cc-index CC-MAIN-2026-39 \
+  --cc-index CC-MAIN-2026-34
+```
+
+## Merge Wayback and Common Crawl
+
+```bash
+wayparam -d example.com --source wayback,commoncrawl --stdout --no-files
+```
+
+The output is deduplicated across sources. For provenance, use JSONL:
+
+```bash
+wayparam -d example.com --source wayback,commoncrawl \
+  --stdout --no-files --format jsonl
+```
+
+---
+
 ## Keep parameter values (careful)
 
 ```bash
@@ -108,5 +139,4 @@ capture count and first/last seen timestamps.
 wayparam -l domains.txt --summary --format jsonl
 ```
 
-Historical modes automatically disable CDX collapse; expect them to retrieve
-more rows than a normal URL collection.
+Historical modes are currently Wayback-only and automatically disable CDX collapse; expect them to retrieve more rows than a normal URL collection.

@@ -49,6 +49,39 @@ def test_defaults_match_the_cli():
     assert cfg.normalize.only_params is True
     assert cfg.normalize.drop_tracking is True
     assert cfg.cdx.collapse == "urlkey"
+    assert cfg.sources == ("wayback",)
+    assert cfg.commoncrawl.indexes == ("latest",)
+
+
+def test_source_selection_and_commoncrawl_options():
+    cfg = config_from_request(
+        {
+            "domains": "example.com",
+            "source": "commoncrawl,wayback",
+            "cc_index": "CC-MAIN-2026-39, CC-MAIN-2026-34",
+            "cc_page_size": 3,
+            "cc_rps": 0.5,
+        }
+    )
+    assert cfg.sources == ("commoncrawl", "wayback")
+    assert cfg.commoncrawl.indexes == ("CC-MAIN-2026-39", "CC-MAIN-2026-34")
+    assert cfg.commoncrawl.page_size == 3
+    assert cfg.commoncrawl.rps == 0.5
+
+
+def test_invalid_source_is_rejected():
+    with pytest.raises(Rejected) as exc:
+        config_from_request({"domains": "example.com", "source": "unknown"})
+    assert exc.value.status == 400
+
+
+def test_historical_analysis_rejects_commoncrawl():
+    with pytest.raises(Rejected) as exc:
+        config_from_request(
+            {"domains": "example.com", "source": "commoncrawl", "analysis": "history"}
+        )
+    assert exc.value.status == 400
+    assert "Wayback only" in exc.value.message
 
 
 def test_analysis_mode_is_sanitized():
@@ -238,6 +271,7 @@ def test_a_run_streams_ndjson_events(server, monkeypatch):
 
     assert [e["type"] for e in events] == ["start", "url", "url", "stats", "done"]
     assert events[0]["domains"] == ["example.com"]
+    assert events[0]["sources"] == ["wayback"]
     assert [e["url"] for e in events if e["type"] == "url"] == [
         "https://example.com/?a=FUZZ",
         "https://example.com/?b=FUZZ",

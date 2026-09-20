@@ -10,6 +10,7 @@ embedding code) builds one of these and hands it to `core.run`.
 
 Fields:
 - `domains: list[str]`
+- `sources: tuple["wayback" | "commoncrawl", ...]` (default: `("wayback",)`)
 - `outdir: Path` (default: `results`)
 - `write_files: bool` (default: `True`)
 - `out_format: "txt" | "jsonl"`
@@ -17,8 +18,8 @@ Fields:
 - `max_results: int` (default: `0`, meaning no cap) — global budget across the
   whole run, not per domain
 - `concurrency: int`, `rps: float`
-- `http: HttpConfig`, `cdx: CdxOptions`, `normalize: NormalizeOptions`,
-  `filters: FilterOptions`
+- `http: HttpConfig`, `cdx: CdxOptions`, `commoncrawl: CommonCrawlOptions`,
+  `normalize: NormalizeOptions`, `filters: FilterOptions`
 
 ### `build_filter_options(ext_blacklist, ext_whitelist, exclude_path_regex) -> FilterOptions`
 Turns the textual filter settings every frontend collects into options. A
@@ -33,7 +34,9 @@ Processes every domain in `cfg`. `on_record` is called for each emitted
 page.
 
 `BrokenPipeError` is never collected into the result: a closed output means the
-consumer went away, which ends the whole run.
+consumer went away, which ends the whole run. Configured providers run in user
+order and normalized URLs are deduplicated across providers; if one provider
+fails, later providers are still attempted and the domain is marked incomplete.
 
 ### `RunResult`
 - `stats: list[DomainStats]`
@@ -55,6 +58,32 @@ itself. Deliberately not the built-in `hash()`, which is randomised per process.
 ### `Budget`
 The global `max_results` counter shared by every domain in a run. `take()`
 claims one slot and returns False once the cap is reached.
+
+## `wayparam.providers`
+
+### `SourceRecord`
+Provider-neutral archived URL record with:
+- `original`
+- `source` (`wayback` or `commoncrawl`)
+- optional `timestamp`, `status_code`, `mime_type`
+
+### `UrlProvider`
+Protocol implemented by URL sources. `iter_urls(domain, client=...)` yields
+`SourceRecord` values.
+
+### `build_providers(cfg)`
+Builds provider instances in `RunConfig.sources` order.
+
+### `CommonCrawlOptions`
+Fields:
+- `indexes: tuple[str, ...]` (default: `("latest",)`)
+- `page_size: int` (default: 5 ZipNum blocks)
+- `rps: float` (default: 1.0)
+- `filters: tuple[str, ...]`
+
+### `CommonCrawlProvider`
+Resolves `latest` through Common Crawl collection metadata, serializes API
+requests, walks CDXJ pages, and yields provider-neutral records.
 
 ## `wayparam.analysis`
 
@@ -81,10 +110,10 @@ Fields:
 - `user_agent: Optional[str]`
 - `proxy: Optional[str]`
 
-### `get_text(client, url, params, config) -> str`
-Performs a GET request and returns response text, with retry/backoff behavior.
+### `get_text(client, url, params, config, empty_statuses=None) -> str`
+Performs a GET request and returns response text, with retry/backoff behavior. Provider-specific statuses may be treated as an empty result via `empty_statuses`.
 
-### `iter_lines(client, url, params, config) -> AsyncIterator[str]`
+### `iter_lines(client, url, params, config, empty_statuses=None) -> AsyncIterator[str]`
 The same request, streamed: yields non-empty lines as they arrive instead of
 buffering the body. Used for CDX block pages, which run to tens of megabytes.
 A retry restarts the request — a body cannot be resumed mid-flight — and skips

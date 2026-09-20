@@ -44,6 +44,64 @@ cat domains.txt | wayparam -l -
 
 ---
 
+## Archive sources
+
+### `--source NAME[,NAME...]`
+Choose one or more archive providers in priority order.
+
+**Default:** `wayback`
+
+Supported values:
+- `wayback`
+- `commoncrawl`
+- `wayback,commoncrawl` (or the reverse order)
+
+Normalized URLs are deduplicated across providers. With JSONL output, the
+`source` field names the provider that discovered a normalized URL first.
+
+```bash
+wayparam -d example.com --source commoncrawl
+wayparam -d example.com --source wayback,commoncrawl --format jsonl
+```
+
+### `--cc-index ID`
+Choose a Common Crawl CDXJ collection. Repeat the option or use a comma-separated
+value to query several crawls.
+
+**Default:** `latest` (resolved through Common Crawl `collinfo.json`)
+
+```bash
+wayparam -d example.com --source commoncrawl --cc-index CC-MAIN-2026-39
+wayparam -d example.com --source commoncrawl \
+  --cc-index CC-MAIN-2026-39 --cc-index CC-MAIN-2026-34
+```
+
+### `--cc-page-size N`
+Compressed Common Crawl ZipNum index blocks per result page. This is **not** a
+row count.
+
+**Default:** `5`
+
+### `--cc-rps FLOAT`
+Common Crawl index requests per second. Common Crawl requests are also
+serialized within a run.
+
+**Default:** `1`
+
+Setting `0` disables the delay, but wayparam warns because Common Crawl asks
+clients to sleep between API calls.
+
+### `--cc-filter FILTER`
+Provider-native Common Crawl CDXJ filter. Repeatable.
+
+```bash
+wayparam -d example.com --source commoncrawl --cc-filter status:200
+```
+
+See [Archive sources](../sources.md) for provider-specific behavior.
+
+---
+
 ## Output
 
 ### `-o, --outdir DIR`
@@ -117,7 +175,7 @@ The following flags are mutually exclusive:
 - `--params`: one record per query-parameter name, with endpoint count, capture count and first/last seen
 - `--summary`: one aggregate record per domain
 
-Historical modes request `timestamp,statuscode,mimetype,original` from CDX and automatically disable `collapse=urlkey`, because collapsed results cannot provide correct capture counts or first/last-seen dates.
+Historical modes currently require `--source wayback`. They request `timestamp,statuscode,mimetype,original` from Wayback CDX and automatically disable `collapse=urlkey`, because collapsed results cannot provide correct capture counts or first/last-seen dates.
 
 ```bash
 wayparam -d example.com --history --stdout --no-files --format jsonl
@@ -129,7 +187,7 @@ Text output is tab-separated. JSONL output uses structured records. File output 
 
 ---
 
-## Wayback / CDX query options
+## Shared archive query options
 
 ### `--include-subdomains`
 Include subdomains by using CDX `matchType=domain` instead of `host`.
@@ -168,11 +226,13 @@ wayparam -d example.com --to 2021
 ### `--no-collapse`
 Disable `collapse=urlkey`.
 
-**Default:** collapse enabled (dedup at CDX side)
+**Default:** collapse enabled (dedup at archive-index side)
 
-Disabling collapse returns more duplicates and increases transfer size. It used
-to also be the only lossless way to page through a large result; that is no
-longer the case — see `--pagination` below.
+Disabling collapse returns more duplicates and increases transfer size.
+
+---
+
+## Wayback-specific CDX options
 
 ### `--pagination {auto,blocks,resume}`
 How to walk a result that does not fit in one response. The CDX API offers two
@@ -235,7 +295,7 @@ A run stopped by the budget is a success (exit 0), and `--stats` marks the
 affected domains `(incomplete)`.
 
 ### `--filter FILTER`
-Pass a CDX filter (repeatable). This is forwarded to the CDX API as-is.
+Pass a Wayback CDX filter (repeatable). This is forwarded to the Wayback API as-is.
 
 **Default:** none
 
@@ -379,7 +439,7 @@ wayparam -d example.com --retries 2
 ```
 
 ### `--proxy URL`
-Use an HTTP proxy.
+Use an HTTP proxy. When Common Crawl is selected, wayparam warns because the Common Crawl public-index guidance advises against proxy networks, but it does not silently ignore the configured proxy.
 
 **Default:** none
 
@@ -391,7 +451,7 @@ wayparam -d example.com --proxy http://127.0.0.1:8080
 ### `--user-agent STR`
 Override the User-Agent header.
 
-**Default:** a browser-like User-Agent selected once per process
+**Default:** a browser-like User-Agent for Wayback; Common Crawl uses a descriptive `wayparam/<version>` client User-Agent unless this option overrides it
 
 Example:
 ```bash

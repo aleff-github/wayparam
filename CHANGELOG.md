@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+- Added archive provider abstraction with Wayback remaining the default source
+- Added Common Crawl CDXJ URL discovery via `--source commoncrawl`
+- Added ordered multi-source collection with `--source wayback,commoncrawl` and cross-provider deduplication
+- Added dynamic latest-crawl discovery from Common Crawl `collinfo.json` plus explicit/repeatable `--cc-index`
+- Added Common Crawl-specific `--cc-page-size`, `--cc-rps` and `--cc-filter` options
+- Common Crawl requests are serialized per run and use a descriptive User-Agent by default
+- Added Common Crawl source controls to the optional local web UI
+- Historical intelligence remains Wayback-only and now rejects ambiguous multi-archive analysis explicitly
+- HTTP helpers can treat provider-specific empty statuses such as Common Crawl 404/no-capture as an empty result
+
 ## 0.5.0
 - Added capture-level historical intelligence with `--history`, `--params` and `--summary`
 - Historical modes request CDX timestamp/status/MIME metadata and disable `collapse=urlkey` so first/last seen and capture counts remain meaningful

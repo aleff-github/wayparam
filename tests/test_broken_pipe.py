@@ -216,3 +216,67 @@ def test_summary_mode_prints_structured_jsonl(monkeypatch, capsys):
     out = capsys.readouterr().out
     assert '"type":"summary"' in out
     assert '"unique_urls":1' in out
+
+
+def test_source_defaults_to_wayback():
+    parser = cli.build_arg_parser()
+    cfg = cli.build_config(parser.parse_args(["-d", "example.com"]))
+    assert cfg.sources == ("wayback",)
+
+
+def test_multiple_sources_preserve_priority_and_reject_duplicates():
+    parser = cli.build_arg_parser()
+    cfg = cli.build_config(
+        parser.parse_args(["-d", "example.com", "--source", "commoncrawl,wayback,commoncrawl"])
+    )
+    assert cfg.sources == ("commoncrawl", "wayback")
+
+
+def test_unknown_source_is_a_usage_error():
+    parser = cli.build_arg_parser()
+    with pytest.raises(SystemExit) as exc:
+        parser.parse_args(["-d", "example.com", "--source", "unknown"])
+    assert exc.value.code == 2
+
+
+def test_commoncrawl_options_reach_the_config():
+    parser = cli.build_arg_parser()
+    cfg = cli.build_config(
+        parser.parse_args(
+            [
+                "-d",
+                "example.com",
+                "--source",
+                "commoncrawl",
+                "--cc-index",
+                "CC-MAIN-2026-39,CC-MAIN-2026-34",
+                "--cc-page-size",
+                "3",
+                "--cc-rps",
+                "0.5",
+                "--cc-filter",
+                "status:200",
+            ]
+        )
+    )
+    assert cfg.commoncrawl.indexes == ("CC-MAIN-2026-39", "CC-MAIN-2026-34")
+    assert cfg.commoncrawl.page_size == 3
+    assert cfg.commoncrawl.rps == 0.5
+    assert cfg.commoncrawl.filters == ("status:200",)
+
+
+def test_historical_analysis_rejects_non_wayback_sources(capsys):
+    with pytest.raises(SystemExit) as exc:
+        cli.main(
+            [
+                "-d",
+                "example.com",
+                "--source",
+                "commoncrawl",
+                "--history",
+                "--stdout",
+                "--no-files",
+            ]
+        )
+    assert exc.value.code == 2
+    assert "currently require --source wayback" in capsys.readouterr().err

@@ -47,6 +47,22 @@ wayparam -d example.com --stdout --no-files --format jsonl
 wayparam -d example.com --rps 1 --concurrency 2
 ```
 
+### Query Common Crawl
+```bash
+wayparam -d example.com --source commoncrawl
+```
+
+### Merge Wayback and Common Crawl
+```bash
+wayparam -d example.com --source wayback,commoncrawl
+```
+
+Use JSONL if you want the `source` field for provenance:
+
+```bash
+wayparam -d example.com --source wayback,commoncrawl --stdout --no-files --format jsonl
+```
+
 ### Historical endpoint intelligence
 ```bash
 wayparam -d example.com --history --stdout --no-files --format jsonl
