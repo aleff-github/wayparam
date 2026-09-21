@@ -136,6 +136,77 @@ class DomainHistory:
             total.update(endpoint.mime_types)
         return total
 
+    def _entities_for_period(self, period: str) -> tuple[set[str], set[str]]:
+        urls: set[str] = set()
+        parameters: set[str] = set()
+        for endpoint in self.endpoints.values():
+            if not any(month.startswith(period) for month in endpoint.capture_months):
+                continue
+            urls.add(endpoint.url)
+            parameters.update(
+                key
+                for key, _ in parse_qsl(urlsplit(endpoint.url).query, keep_blank_values=True)
+            )
+        return urls, parameters
+
+    def changes(self, baseline: str, comparison: str) -> list[dict]:
+        """Compare normalized URL and parameter evidence between two periods."""
+        baseline_urls, baseline_parameters = self._entities_for_period(baseline)
+        comparison_urls, comparison_parameters = self._entities_for_period(comparison)
+
+        url_added = comparison_urls - baseline_urls
+        url_removed = baseline_urls - comparison_urls
+        url_persisted = baseline_urls & comparison_urls
+        parameter_added = comparison_parameters - baseline_parameters
+        parameter_removed = baseline_parameters - comparison_parameters
+        parameter_persisted = baseline_parameters & comparison_parameters
+
+        summary = {
+            "type": "change_summary",
+            "domain": self.domain,
+            "baseline": baseline,
+            "comparison": comparison,
+            "granularity": "year" if len(baseline) == 4 else "month",
+            "urls": {
+                "baseline": len(baseline_urls),
+                "comparison": len(comparison_urls),
+                "added": len(url_added),
+                "removed": len(url_removed),
+                "persisted": len(url_persisted),
+            },
+            "parameters": {
+                "baseline": len(baseline_parameters),
+                "comparison": len(comparison_parameters),
+                "added": len(parameter_added),
+                "removed": len(parameter_removed),
+                "persisted": len(parameter_persisted),
+            },
+        }
+
+        records = [summary]
+        groups = (
+            ("url", "added", url_added),
+            ("url", "removed", url_removed),
+            ("url", "persisted", url_persisted),
+            ("parameter", "added", parameter_added),
+            ("parameter", "removed", parameter_removed),
+            ("parameter", "persisted", parameter_persisted),
+        )
+        for entity, status, values in groups:
+            records.extend(
+                {
+                    "type": "change",
+                    "domain": self.domain,
+                    "baseline": baseline,
+                    "comparison": comparison,
+                    "entity": entity,
+                    "status": status,
+                    "value": value,
+                }
+                for value in sorted(values)
+            )
+        return records
+
     def timeline(self, granularity: TimelineGranularity = "year") -> list[dict]:
         """Aggregate accepted archive evidence into deterministic time buckets."""
 
@@ -316,6 +387,7 @@ def records_for(
     mode: AnalysisMode,
     *,
     timeline_granularity: TimelineGranularity = "year",
+    compare_periods: tuple[str, str] | None = None,
 ) -> list[dict]:
     """Return deterministic serializable records for one analysis view."""
     if mode == "history":
@@ -349,6 +421,11 @@ def records_for(
 
     if mode == "timeline":
         return history.timeline(timeline_granularity)
+
+    if mode == "changes":
+        if compare_periods is None:
+            raise ValueError("changes analysis requires two comparison periods")
+        return history.changes(*compare_periods)
 
     params = history.parameters()
     return [
@@ -408,6 +485,34 @@ def format_record(record: dict, fmt: OutputFormat) -> str:
                 str(record["new_parameters"]),
             ]
         )
+    if kind == "change_summary":
+        urls = record["urls"]
+        params = record["parameters"]
+        return "\t".join(
+            [
+                "summary",
+                record["baseline"],
+                record["comparison"],
+                f"urls={urls['baseline']}->{urls['comparison']}",
+                f"url_added={urls['added']}",
+                f"url_removed={urls['removed']}",
+                f"url_persisted={urls['persisted']}",
+                f"parameters={params['baseline']}->{params['comparison']}",
+                f"parameter_added={params['added']}",
+                f"parameter_removed={params['removed']}",
+                f"parameter_persisted={params['persisted']}",
+            ]
+        )
+    if kind == "change":
+        return "\t".join(
+            [
+                record["baseline"],
+                record["comparison"],
+                record["entity"],
+                record["status"],
+                record["value"],
+            ]
+        )
     return "\t".join(
         [
             record["domain"],
@@ -438,5 +543,10 @@ def write_analysis_files(result: HistoryRunResult, cfg: RunConfig, mode: Analysi
         if history is None:
             continue
         with open_outfile(analysis_path(cfg.outdir, domain, mode, cfg.out_format)) as fh:
-            for record in records_for(history, mode, timeline_granularity=cfg.timeline_granularity):
+            for record in records_for(
+                history,
+                mode,
+                timeline_granularity=cfg.timeline_granularity,
+                compare_periods=cfg.compare_periods,
+            ):
                 fh.write(format_record(record, cfg.out_format) + "\n")
