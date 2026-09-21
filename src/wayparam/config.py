@@ -20,7 +20,7 @@ from .output import OutputFormat
 from .providers import CommonCrawlOptions, SourceName
 from .wayback import CdxOptions
 
-AnalysisMode = Literal["history", "params", "summary", "timeline"]
+AnalysisMode = Literal["history", "params", "summary", "timeline", "changes"]
 TimelineGranularity = Literal["year", "month"]
 
 
@@ -34,6 +34,8 @@ class RunConfig:
     analysis: AnalysisMode | None = None
     #: Time bucket used by the temporal timeline analysis.
     timeline_granularity: TimelineGranularity = "year"
+    #: Two YYYY or YYYYMM buckets compared by temporal change analysis.
+    compare_periods: tuple[str, str] | None = None
     #: Preserve one normalized record per archive source instead of globally deduplicating.
     provenance: bool = False
     #: Aggregate provider overlap/exclusive coverage instead of emitting URLs.
