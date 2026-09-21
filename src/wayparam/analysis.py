@@ -116,9 +116,7 @@ class PathTopology:
         self.first_seen = _min_ts(self.first_seen, endpoint.first_seen)
         self.last_seen = _max_ts(self.last_seen, endpoint.last_seen)
 
-        names = tuple(
-            sorted({key for key, _ in parse_qsl(parts.query, keep_blank_values=True)})
-        )
+        names = tuple(sorted({key for key, _ in parse_qsl(parts.query, keep_blank_values=True)}))
         self.parameters.update(names)
         variant = self.parameter_sets.get(names)
         if variant is None:
@@ -581,10 +579,13 @@ def format_record(record: dict, fmt: OutputFormat) -> str:
             ]
         )
     if kind == "topology":
-        parameter_sets = ";".join(
-            f"{','.join(item['parameters']) or '-'}:{item['unique_urls']}:{item['captures']}"
-            for item in record["parameter_sets"]
-        ) or "-"
+        parameter_sets = (
+            ";".join(
+                f"{','.join(item['parameters']) or '-'}:{item['unique_urls']}:{item['captures']}"
+                for item in record["parameter_sets"]
+            )
+            or "-"
+        )
         return "\t".join(
             [
                 record["host"],
