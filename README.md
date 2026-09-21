@@ -25,6 +25,7 @@ http://www.example.com/?format=FUZZ&retailerId=FUZZ
 ## Key features
 
 - **Multi-source archive collection**: Wayback CDX (default), Common Crawl CDXJ, or both
+- **Opt-in source provenance**: preserve the same normalized endpoint once per archive source in JSONL
 - **Async + concurrency** for speed on multiple domains
 - **Rate limiting** (`--rps`) to be polite with Wayback/CDX
 - **Retry + backoff** and clearer error messages
@@ -186,13 +187,21 @@ wayparam -d example.com --source wayback,commoncrawl
 
 The source order is the priority order. Results are deduplicated across providers; in JSONL, `source` records the provider that found a normalized URL first.
 
-### 9) Historical endpoint intelligence
+### 9) Preserve complete source provenance
+
+```bash
+wayparam -d example.com --source wayback,commoncrawl --provenance --format jsonl --stdout --no-files
+```
+
+By default, the first configured provider wins when the same normalized URL appears in several archives. With `--provenance`, Wayparam keeps one JSONL record per source while still deduplicating repeated variants inside each source. This mode is intentionally JSONL-only because TXT output cannot carry provenance.
+
+### 10) Historical endpoint intelligence
 
 ```bash
 wayparam -d example.com --history --stdout --no-files --format jsonl
 ```
 
-### 10) Parameter history or a domain summary
+### 11) Parameter history or a domain summary
 
 ```bash
 wayparam -d example.com --params
@@ -264,6 +273,7 @@ wayparam -d example.com --stdout --no-files | sort -u > urls.txt
 * `--source wayback` (default)
 * `--source commoncrawl`
 * `--source wayback,commoncrawl` (ordered priority)
+* `--provenance --format jsonl` to keep one normalized record per selected archive source
 * `--cc-index latest` or a crawl such as `CC-MAIN-2026-39` (repeatable)
 * `--cc-page-size 5` (compressed Common Crawl index blocks per page)
 * `--cc-rps 1` (Common Crawl request rate; default intentionally conservative)
