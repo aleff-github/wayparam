@@ -138,6 +138,13 @@ Choose the bucket size used by
 (default:
 .BR year ).
 .TP
+.BR \-\-changes " " \fIBASELINE COMPARISON\fR
+Compare archive evidence between two periods. Both values must use the same
+granularity, either YYYY or YYYYMM, and BASELINE must be earlier than
+COMPARISON. Output classifies normalized URLs and parameter names as added,
+removed or persisted. These classifications describe archive evidence, not
+current live-target state.
+.TP
 .BR \-\-source\-summary
 Compare normalized URL coverage across at least two selected archive sources.
 The summary reports the union, per-source counts, source-exclusive counts, URLs
@@ -337,6 +344,14 @@ Build a month-by-month archive timeline:
 wayparam -d example.com --timeline --timeline-granularity month --format jsonl
 .fi
 .RE
+.PP
+Compare archive evidence between two years:
+.PP
+.RS
+.nf
+wayparam -d example.com --changes 2020 2024 --format jsonl
+.fi
+.RE
 .SH FILES
 .TP
 .I results/<domain>.txt
@@ -357,6 +372,9 @@ Historical domain summary.
 .TP
 .I results/<domain>.timeline.{txt,jsonl}
 Historical temporal timeline.
+.TP
+.I results/<domain>.changes.{txt,jsonl}
+Historical comparison between two archive periods.
 .SH EXIT STATUS
 .TP
 .B 0
