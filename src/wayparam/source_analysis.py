@@ -77,11 +77,11 @@ class _Accumulator:
         for bit in self._bits.values():
             all_mask |= bit
 
-        source_counts = {
+        source_counts: dict[str, int] = {
             source: sum(bool(mask & self._bits[source]) for mask in masks.values())
             for source in self.sources
         }
-        exclusive_counts = {
+        exclusive_counts: dict[str, int] = {
             source: sum(mask == self._bits[source] for mask in masks.values())
             for source in self.sources
         }
