@@ -1,3 +1,15 @@
+wayparam (0.7.0-1) noble; urgency=medium
+
+  * New upstream release.
+  * Add opt-in per-source provenance for normalized archive URL evidence.
+  * Add provider-neutral source overlap summaries with union, shared,
+    all-source overlap and source-exclusive counts.
+  * Apply bounded source-summary budgets independently to each selected
+    provider so later archive sources are not starved.
+  * Expose provenance and source overlap summaries in the local web UI.
+
+ -- Aleff <alessandro.greco.1@protonmail.com>  Mon, 21 Sep 2026 15:10:00 +0200
+
 wayparam (0.6.1-1) noble; urgency=medium
 
   * New upstream patch release.
