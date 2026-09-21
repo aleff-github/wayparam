@@ -281,9 +281,14 @@ The local web interface exposes the same historical views from the **View** sele
 - Temporal changes
 - Surface topology
 - Parameter co-occurrence
+- Evidence report
 
 When **Temporal changes** is selected, enter a baseline and comparison period using
 the same `YYYY` or `YYYYMM` rules as `--changes`.
+
+When **Evidence report** is selected, JSONL is enforced automatically. The same
+period fields are optional: leave both blank for the default report sections, or
+fill both to include period-change evidence in the versioned bundle.
 
 Historical records are emitted after each domain has been aggregated, while the
 normal URL view continues to stream URLs as they are discovered.
