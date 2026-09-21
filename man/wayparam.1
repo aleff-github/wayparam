@@ -126,6 +126,13 @@ count, represented captures and first/last seen timestamps.
 .TP
 .BR \-\-summary
 Emit one historical aggregate record per domain.
+.TP
+.BR \-\-source\-summary
+Compare normalized URL coverage across at least two selected archive sources.
+The summary reports the union, per-source counts, source-exclusive counts, URLs
+shared by at least two sources, and the intersection observed by every selected
+source. Output files use
+.IR <domain>.sources.{txt,jsonl} .
 .PP
 Historical modes currently require
 .BR "--source wayback" .
@@ -178,7 +185,9 @@ to bound a run.
 .BR \-\-max\-results " " \fIN\fR
 Stop the whole run after this many URLs. The budget is global, shared by every
 domain in the run (default: 0, no cap). In historical analysis modes the budget
-counts accepted capture rows before aggregation. A run stopped by the budget exits 0, and
+counts accepted capture rows before aggregation. In source-summary mode it
+counts per-source normalized evidence records before aggregation. A run stopped
+by the budget exits 0, and
 .BR \-\-stats
 marks the affected domains as incomplete.
 .SS Normalization and Filtering
@@ -282,6 +291,14 @@ Combine Wayback and Common Crawl, deduplicating in that order:
 .RS
 .nf
 wayparam -d example.com --source wayback,commoncrawl --format jsonl
+.fi
+.RE
+.PP
+Compare normalized URL coverage between Wayback and Common Crawl:
+.PP
+.RS
+.nf
+wayparam -d example.com --source wayback,commoncrawl --source-summary --format jsonl
 .fi
 .RE
 .PP
