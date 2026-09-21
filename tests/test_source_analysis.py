@@ -146,7 +146,6 @@ def test_source_summary_writes_mode_specific_file(tmp_path, monkeypatch):
     assert json.loads(path.read_text().strip())["type"] == "source_summary"
 
 
-
 def test_bounded_source_summary_gives_each_provider_its_own_budget(tmp_path, monkeypatch):
     calls = []
 
@@ -207,9 +206,7 @@ def test_bounded_source_summary_progress_is_monotonic_across_sources(tmp_path, m
     asyncio.run(
         run_source_summary(
             cfg,
-            on_progress=lambda domain, fetched, kept: progress.append(
-                (domain, fetched, kept)
-            ),
+            on_progress=lambda domain, fetched, kept: progress.append((domain, fetched, kept)),
         )
     )
 
