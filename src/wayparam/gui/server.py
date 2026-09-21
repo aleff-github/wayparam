@@ -279,6 +279,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     "domain": rec.domain,
                     "url": rec.url,
                     "source": rec.source,
+                    "fetched_at": rec.fetched_at,
                 }
             )
 
