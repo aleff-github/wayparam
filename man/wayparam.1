@@ -127,6 +127,17 @@ count, represented captures and first/last seen timestamps.
 .BR \-\-summary
 Emit one historical aggregate record per domain.
 .TP
+.BR \-\-timeline
+Aggregate accepted historical archive evidence into time buckets. Each record
+reports captures, observed and newly seen normalized URLs, and observed and
+newly seen query-parameter names.
+.TP
+.BR \-\-timeline\-granularity " " \fIyear|month\fR
+Choose the bucket size used by
+.BR \-\-timeline
+(default:
+.BR year ).
+.TP
 .BR \-\-source\-summary
 Compare normalized URL coverage across at least two selected archive sources.
 The summary reports the union, per-source counts, source-exclusive counts, URLs
@@ -318,6 +329,14 @@ Summarize historical parameter prevalence:
 wayparam -d example.com --params
 .fi
 .RE
+.PP
+Build a month-by-month archive timeline:
+.PP
+.RS
+.nf
+wayparam -d example.com --timeline --timeline-granularity month --format jsonl
+.fi
+.RE
 .SH FILES
 .TP
 .I results/<domain>.txt
@@ -335,6 +354,9 @@ Historical parameter analysis.
 .TP
 .I results/<domain>.summary.{txt,jsonl}
 Historical domain summary.
+.TP
+.I results/<domain>.timeline.{txt,jsonl}
+Historical temporal timeline.
 .SH EXIT STATUS
 .TP
 .B 0
