@@ -10,7 +10,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from .config import RunConfig
-from .core import DomainStats, fingerprint, run
+from .core import DomainStats, ProgressCallback, fingerprint, run
 from .output import OutputFormat, UrlRecord
 from .providers import SourceName
 
@@ -60,7 +60,7 @@ class _Accumulator:
 
     def __init__(self, sources: tuple[SourceName, ...]):
         self.sources = sources
-        self._bits = {source: 1 << i for i, source in enumerate(sources)}
+        self._bits: dict[str, int] = {source: 1 << i for i, source in enumerate(sources)}
         self._masks: dict[str, dict[int, int]] = {}
 
     def add(self, record: UrlRecord) -> None:
@@ -104,7 +104,7 @@ class _Accumulator:
 async def run_source_summary(
     cfg: RunConfig,
     *,
-    on_progress=None,
+    on_progress: ProgressCallback | None = None,
 ) -> SourceSummaryRunResult:
     """Run the normal collector in provenance mode and aggregate source membership."""
     accumulator = _Accumulator(cfg.sources)
