@@ -144,3 +144,73 @@ def test_source_summary_writes_mode_specific_file(tmp_path, monkeypatch):
     path = cfg.outdir / "example.com.sources.jsonl"
     assert path.is_file()
     assert json.loads(path.read_text().strip())["type"] == "source_summary"
+
+
+def test_bounded_source_summary_gives_each_provider_its_own_budget(tmp_path, monkeypatch):
+    calls = []
+
+    async def fake_run(cfg, *, on_record=None, on_progress=None):
+        calls.append((cfg.sources, cfg.max_results))
+        source = cfg.sources[0]
+        if on_record:
+            for i in range(cfg.max_results):
+                on_record(
+                    UrlRecord(
+                        "example.com",
+                        f"https://example.com/{source}/{i}?id=FUZZ",
+                        source,
+                    )
+                )
+        return RunResult(
+            stats=[
+                DomainStats(
+                    "example.com",
+                    fetched=cfg.max_results,
+                    kept=cfg.max_results,
+                    complete=False,
+                )
+            ]
+        )
+
+    monkeypatch.setattr(source_analysis, "run", fake_run)
+    cfg = _cfg(tmp_path, max_results=3)
+    result = asyncio.run(run_source_summary(cfg))
+
+    assert calls == [(("wayback",), 3), (("commoncrawl",), 3)]
+    summary = result.summaries["example.com"]
+    assert summary.source_counts == {"wayback": 3, "commoncrawl": 3}
+    assert summary.evidence_records == 6
+    assert summary.union_urls == 6
+    assert summary.complete is False
+    assert result.stats[0].kept == 6
+
+
+def test_bounded_source_summary_progress_is_monotonic_across_sources(tmp_path, monkeypatch):
+    async def fake_run(cfg, *, on_record=None, on_progress=None):
+        source = cfg.sources[0]
+        if on_record:
+            on_record(
+                UrlRecord(
+                    "example.com",
+                    f"https://example.com/{source}?id=FUZZ",
+                    source,
+                )
+            )
+        if on_progress:
+            on_progress("example.com", 4, 1)
+        return RunResult(stats=[DomainStats("example.com", 4, 1, False)])
+
+    monkeypatch.setattr(source_analysis, "run", fake_run)
+    progress = []
+    cfg = _cfg(tmp_path, max_results=1)
+    asyncio.run(
+        run_source_summary(
+            cfg,
+            on_progress=lambda domain, fetched, kept: progress.append((domain, fetched, kept)),
+        )
+    )
+
+    assert progress == [
+        ("example.com", 4, 1),
+        ("example.com", 8, 2),
+    ]

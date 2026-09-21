@@ -106,22 +106,84 @@ async def run_source_summary(
     *,
     on_progress: ProgressCallback | None = None,
 ) -> SourceSummaryRunResult:
-    """Run the normal collector in provenance mode and aggregate source membership."""
-    accumulator = _Accumulator(cfg.sources)
-    collection_cfg = replace(
-        cfg,
-        provenance=True,
-        source_summary=False,
-        write_files=False,
-        analysis=None,
-    )
-    collected = await run(
-        collection_cfg,
-        on_record=accumulator.add,
-        on_progress=on_progress,
-    )
+    """Collect provider membership without letting a bound starve later sources.
 
-    complete_by_domain = {stat.domain: stat.complete for stat in collected.stats}
+    An unlimited summary can use the normal multi-source collector directly.
+    With max_results, however, that global budget would be consumed by the
+    first provider before later providers are queried. Bounded summaries
+    therefore give each selected source the same run-wide budget, preserving a
+    useful (explicitly incomplete) sample from every provider.
+    """
+    accumulator = _Accumulator(cfg.sources)
+    errors: list[tuple[str, Exception]] = []
+
+    if cfg.max_results == 0:
+        collection_cfg = replace(
+            cfg,
+            provenance=True,
+            source_summary=False,
+            write_files=False,
+            analysis=None,
+        )
+        collected = await run(
+            collection_cfg,
+            on_record=accumulator.add,
+            on_progress=on_progress,
+        )
+        stats = collected.stats
+        errors.extend(collected.errors)
+    else:
+        totals: dict[str, list[int]] = {domain: [0, 0] for domain in cfg.domains}
+        complete_by_domain = {domain: True for domain in cfg.domains}
+        for source in cfg.sources:
+            offsets = {domain: (values[0], values[1]) for domain, values in totals.items()}
+
+            def source_progress(
+                domain: str,
+                fetched: int,
+                kept: int,
+                _offsets: dict[str, tuple[int, int]] = offsets,
+            ) -> None:
+                if on_progress is None:
+                    return
+                base_fetched, base_kept = _offsets.get(domain, (0, 0))
+                on_progress(domain, base_fetched + fetched, base_kept + kept)
+
+            collection_cfg = replace(
+                cfg,
+                sources=(source,),
+                provenance=False,
+                source_summary=False,
+                write_files=False,
+                analysis=None,
+            )
+            collected = await run(
+                collection_cfg,
+                on_record=accumulator.add,
+                on_progress=source_progress if on_progress is not None else None,
+            )
+            by_domain = {stat.domain: stat for stat in collected.stats}
+            for domain in cfg.domains:
+                stat = by_domain.get(domain)
+                if stat is None:
+                    complete_by_domain[domain] = False
+                    continue
+                totals[domain][0] += stat.fetched
+                totals[domain][1] += stat.kept
+                complete_by_domain[domain] &= stat.complete
+            errors.extend(collected.errors)
+
+        stats = [
+            DomainStats(
+                domain=domain,
+                fetched=totals[domain][0],
+                kept=totals[domain][1],
+                complete=complete_by_domain[domain],
+            )
+            for domain in cfg.domains
+        ]
+
+    complete_by_domain = {stat.domain: stat.complete for stat in stats}
     summaries = {
         domain: accumulator.summary(
             domain,
@@ -130,9 +192,9 @@ async def run_source_summary(
         for domain in cfg.domains
     }
     return SourceSummaryRunResult(
-        stats=collected.stats,
+        stats=stats,
         summaries=summaries,
-        errors=collected.errors,
+        errors=errors,
     )
 
 
