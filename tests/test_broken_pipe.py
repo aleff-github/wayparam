@@ -181,6 +181,7 @@ def test_timeline_granularity_reaches_the_config():
     assert cfg.analysis == "timeline"
     assert cfg.timeline_granularity == "month"
 
+
 def test_analysis_views_are_mutually_exclusive():
     parser = cli.build_arg_parser()
     with pytest.raises(SystemExit) as exc:
