@@ -27,3 +27,8 @@ def test_path_regex_still_applies_under_a_whitelist():
     opt = build_filter_options(ext_whitelist=".php", exclude_path_regex=["^/static/"])
     assert is_boring("https://example.com/static/a.php?x=1", opt)
     assert not is_boring("https://example.com/app/a.php?x=1", opt)
+
+
+def test_malformed_bracketed_host_is_dropped_instead_of_raising():
+    opt = build_filter_options()
+    assert is_boring("https://[example.com]/a.php?id=1", opt)
