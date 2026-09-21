@@ -215,8 +215,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--max-results",
         type=_nonnegative_int,
         default=0,
-        help="Stop after this many emitted URLs; in analysis modes, accepted captures "
-        "(0 = no cap).",
+        help="Stop after this many emitted URLs; in historical modes, accepted captures. "
+        "With --source-summary the same cap is applied independently to each selected "
+        "source (0 = no cap).",
     )
 
     # Common Crawl options
