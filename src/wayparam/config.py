@@ -20,7 +20,8 @@ from .output import OutputFormat
 from .providers import CommonCrawlOptions, SourceName
 from .wayback import CdxOptions
 
-AnalysisMode = Literal["history", "params", "summary"]
+AnalysisMode = Literal["history", "params", "summary", "timeline"]
+TimelineGranularity = Literal["year", "month"]
 
 
 @dataclass(frozen=True)
@@ -31,6 +32,8 @@ class RunConfig:
     write_files: bool = True
     out_format: OutputFormat = "txt"
     analysis: AnalysisMode | None = None
+    #: Time bucket used by the temporal timeline analysis.
+    timeline_granularity: TimelineGranularity = "year"
     #: Preserve one normalized record per archive source instead of globally deduplicating.
     provenance: bool = False
     #: Aggregate provider overlap/exclusive coverage instead of emitting URLs.
