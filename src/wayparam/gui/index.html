@@ -116,6 +116,8 @@
           <option value="summary">Domain summary</option>
           <option value="timeline">Temporal timeline</option>
           <option value="changes">Temporal changes</option>
+          <option value="topology">Surface topology</option>
+          <option value="cooccurrence">Parameter co-occurrence</option>
         </select></label>
       <div class="row" id="changes_periods">
         <label><span>Baseline period</span>
@@ -277,7 +279,7 @@
 
     const view = $("analysis");
     for (const option of view.options) {
-      if (["history", "params", "summary", "timeline", "changes"].includes(option.value)) {
+      if (["history", "params", "summary", "timeline", "changes", "topology", "cooccurrence"].includes(option.value)) {
         option.disabled = source !== "wayback";
       } else if (option.value === "source_summary") {
         option.disabled = !multiSource;
@@ -289,7 +291,7 @@
 
   function syncModeControls() {
     const mode = val("analysis");
-    const historical = ["history", "params", "summary", "timeline", "changes"].includes(mode);
+    const historical = ["history", "params", "summary", "timeline", "changes", "topology", "cooccurrence"].includes(mode);
     const sourceSummary = mode === "source_summary";
     const timeline = mode === "timeline";
     const changes = mode === "changes";
