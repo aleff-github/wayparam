@@ -185,6 +185,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Aggregate parameter pairs observed together on archived endpoint variants.",
     )
     analysis.add_argument(
+        "--report",
+        dest="analysis",
+        action="store_const",
+        const="report",
+        help="Emit a versioned JSONL evidence bundle from one historical archive pass.",
+    )
+    analysis.add_argument(
         "--changes",
         nargs=2,
         metavar=("BASELINE", "COMPARISON"),
@@ -200,7 +207,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--timeline-granularity",
         choices=["year", "month"],
         default="year",
-        help="Time bucket for --timeline: year or month (default: year).",
+        help="Time bucket for --timeline/--report: year or month (default: year).",
+    )
+    p.add_argument(
+        "--report-changes",
+        nargs=2,
+        metavar=("BASELINE", "COMPARISON"),
+        help="Include YYYY or YYYYMM period-change evidence inside --report.",
     )
 
     # Shared archive query options
@@ -415,11 +428,14 @@ def build_config(args: argparse.Namespace) -> RunConfig:
     else:
         domains = read_domains(args.list)
 
+    raw_compare_periods = args.changes or args.report_changes
     compare_periods = (
-        validate_compare_periods((args.changes[0], args.changes[1])) if args.changes else None
+        validate_compare_periods((raw_compare_periods[0], raw_compare_periods[1]))
+        if raw_compare_periods
+        else None
     )
     analysis_mode: AnalysisMode | None
-    if compare_periods:
+    if args.changes:
         analysis_mode = "changes"
     else:
         analysis_mode = args.analysis
@@ -501,6 +517,12 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--no-files requires --stdout")
     if args.provenance and args.format != "jsonl":
         parser.error("--provenance requires --format jsonl")
+    if args.analysis == "report" and args.format != "jsonl":
+        parser.error("--report requires --format jsonl")
+    if args.report_changes and args.analysis != "report":
+        parser.error("--report-changes requires --report")
+    if args.report_changes and args.changes:
+        parser.error("--report-changes cannot be combined with --changes")
     if args.provenance and (args.analysis or args.changes):
         parser.error("--provenance cannot be combined with historical analysis modes")
     if args.provenance and args.source_summary:
@@ -524,7 +546,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if cfg.analysis and cfg.sources != ("wayback",):
         parser.error(
-            "--history/--params/--summary/--timeline/--changes/--topology/--cooccurrence currently require --source wayback"
+            "--history/--params/--summary/--timeline/--changes/--topology/--cooccurrence/--report currently require --source wayback"
         )
     if cfg.source_summary and len(cfg.sources) < 2:
         parser.error("--source-summary requires at least two archive sources")
@@ -567,15 +589,19 @@ def main(argv: list[str] | None = None) -> int:
 
             write_analysis_files(history_result, cfg, cfg.analysis)
             if args.stdout:
+                stats_by_domain = {item.domain: item for item in history_result.stats}
                 for domain in cfg.domains:
                     history = history_result.analyses.get(domain)
                     if history is None:
                         continue
+                    stats = stats_by_domain.get(domain)
                     for record in records_for(
                         history,
                         cfg.analysis,
                         timeline_granularity=cfg.timeline_granularity,
                         compare_periods=cfg.compare_periods,
+                        report_complete=stats.complete if stats else None,
+                        report_bounded=cfg.max_results > 0,
                     ):
                         print(format_record(record, cfg.out_format), flush=True)
             return _report(history_result, cfg, args.stats)
