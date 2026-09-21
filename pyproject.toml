@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "wayparam"
-version = "0.9.0"
+version = "1.0.0"
 description = "Fetch and normalize parameterized URLs from public web archive indexes (OSINT-friendly)."
 readme = "README.md"
 requires-python = ">=3.9"
