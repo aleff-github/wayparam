@@ -237,6 +237,8 @@ The local web interface exposes the same historical views from the **View** sele
 - Domain summary
 - Temporal timeline
 - Temporal changes
+- Surface topology
+- Parameter co-occurrence
 
 When **Temporal changes** is selected, enter a baseline and comparison period using
 the same `YYYY` or `YYYYMM` rules as `--changes`.
