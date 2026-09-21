@@ -3,12 +3,13 @@
 wayparam can aggregate capture-level metadata from the Wayback CDX API instead
 of returning only normalized URLs.
 
-The three analysis views are mutually exclusive:
+The four analysis views are mutually exclusive:
 
 ```bash
 wayparam -d example.com --history
 wayparam -d example.com --params
 wayparam -d example.com --summary
+wayparam -d example.com --timeline
 ```
 
 They work with the normal filtering, date-range, subdomain, proxy, rate-limit
@@ -104,6 +105,30 @@ Example:
 wayparam -d example.com --summary --format jsonl --stdout --no-files
 ```
 
+## `--timeline`
+
+This view groups accepted historical evidence into deterministic time buckets.
+The default is yearly; use `--timeline-granularity month` for month-level output.
+
+Each bucket reports:
+
+- accepted captures in the bucket
+- unique normalized URLs observed in the bucket
+- normalized URLs whose first accepted capture falls in the bucket
+- unique query-parameter names observed in the bucket
+- query-parameter names whose first accepted capture falls in the bucket
+
+Example:
+
+```bash
+wayparam -d example.com --timeline --timeline-granularity month \
+  --format jsonl --stdout --no-files
+```
+
+A timeline describes archive-index evidence, not whether an endpoint is still
+deployed or reachable today. Date filters such as `--from` and `--to` apply
+before the aggregation.
+
 ## Output files
 
 When files are enabled, analysis views do not overwrite the normal URL output.
@@ -113,6 +138,7 @@ They use mode-specific names:
 results/example.com.history.txt
 results/example.com.params.txt
 results/example.com.summary.txt
+results/example.com.timeline.txt
 ```
 
 With `--format jsonl`, the extension is `.jsonl`.
@@ -125,6 +151,7 @@ The local web interface exposes the same four views from the **View** selector:
 - Historical endpoints
 - Historical parameters
 - Domain summary
+- Temporal timeline
 
 Historical records are emitted after each domain has been aggregated, while the
 normal URL view continues to stream URLs as they are discovered.
