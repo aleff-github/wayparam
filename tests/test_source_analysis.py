@@ -5,10 +5,10 @@ from __future__ import annotations
 import asyncio
 import json
 
+from wayparam import source_analysis
 from wayparam.config import RunConfig
 from wayparam.core import DomainStats, RunResult
 from wayparam.output import UrlRecord
-from wayparam import source_analysis
 from wayparam.source_analysis import (
     format_source_summary,
     run_source_summary,
