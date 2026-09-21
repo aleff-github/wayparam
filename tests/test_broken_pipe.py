@@ -195,6 +195,7 @@ def test_report_changes_reach_the_config():
     assert cfg.analysis == "report"
     assert cfg.compare_periods == ("2020", "2024")
 
+
 def test_timeline_granularity_reaches_the_config():
     parser = cli.build_arg_parser()
     cfg = cli.build_config(
@@ -232,6 +233,7 @@ def test_report_requires_jsonl(capsys):
     assert exc.value.code == 2
     assert "--report requires --format jsonl" in capsys.readouterr().err
 
+
 def test_report_changes_require_report(capsys):
     with pytest.raises(SystemExit) as exc:
         cli.main(
@@ -247,6 +249,7 @@ def test_report_changes_require_report(capsys):
         )
     assert exc.value.code == 2
     assert "--report-changes requires --report" in capsys.readouterr().err
+
 
 def test_analysis_views_are_mutually_exclusive():
     parser = cli.build_arg_parser()
