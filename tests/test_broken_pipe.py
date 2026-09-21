@@ -321,3 +321,44 @@ def test_provenance_rejects_historical_analysis(capsys):
         )
     assert exc.value.code == 2
     assert "--provenance cannot be combined" in capsys.readouterr().err
+
+
+def test_source_summary_flag_reaches_the_config():
+    parser = cli.build_arg_parser()
+    cfg = cli.build_config(
+        parser.parse_args(
+            [
+                "-d",
+                "example.com",
+                "--source",
+                "wayback,commoncrawl",
+                "--source-summary",
+            ]
+        )
+    )
+    assert cfg.source_summary is True
+
+
+def test_source_summary_requires_multiple_sources(capsys):
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["-d", "example.com", "--source-summary"])
+    assert exc.value.code == 2
+    assert "requires at least two archive sources" in capsys.readouterr().err
+
+
+def test_source_summary_rejects_provenance(capsys):
+    with pytest.raises(SystemExit) as exc:
+        cli.main(
+            [
+                "-d",
+                "example.com",
+                "--source",
+                "wayback,commoncrawl",
+                "--source-summary",
+                "--provenance",
+                "--format",
+                "jsonl",
+            ]
+        )
+    assert exc.value.code == 2
+    assert "--provenance cannot be combined with --source-summary" in capsys.readouterr().err
