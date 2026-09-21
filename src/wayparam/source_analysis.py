@@ -139,10 +139,15 @@ async def run_source_summary(
         for source in cfg.sources:
             offsets = {domain: tuple(values) for domain, values in totals.items()}
 
-            def source_progress(domain: str, fetched: int, kept: int) -> None:
+            def source_progress(
+                domain: str,
+                fetched: int,
+                kept: int,
+                _offsets: dict[str, tuple[int, int]] = offsets,
+            ) -> None:
                 if on_progress is None:
                     return
-                base_fetched, base_kept = offsets.get(domain, (0, 0))
+                base_fetched, base_kept = _offsets.get(domain, (0, 0))
                 on_progress(domain, base_fetched + fetched, base_kept + kept)
 
             collection_cfg = replace(
