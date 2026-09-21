@@ -84,7 +84,8 @@ def config_from_request(data: dict) -> RunConfig:
     analysis = cast(
         Optional[AnalysisMode],
         raw_analysis
-        if raw_analysis in ("history", "params", "summary", "timeline", "changes")
+        if raw_analysis
+        in ("history", "params", "summary", "timeline", "changes", "topology", "cooccurrence")
         else None,
     )
     if analysis and sources != ("wayback",):
