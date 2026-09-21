@@ -1,3 +1,12 @@
+wayparam (0.6.1-1) noble; urgency=medium
+
+  * New upstream patch release.
+  * Skip malformed archived URLs instead of aborting Historical Intelligence.
+  * Close nested Common Crawl streams cleanly when bounded runs stop early.
+  * Preserve Python 3.9 compatibility for the Common Crawl cleanup path.
+
+ -- Aleff <alessandro.greco.1@protonmail.com>  Mon, 21 Sep 2026 13:25:00 +0200
+
 wayparam (0.6.0-1) noble; urgency=medium
 
   * New upstream release.
