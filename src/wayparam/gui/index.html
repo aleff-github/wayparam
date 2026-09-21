@@ -110,10 +110,12 @@
       <label><span>View</span>
         <select id="analysis">
           <option value="">Normalized URLs</option>
+          <option value="source_summary">Source overlap summary</option>
           <option value="history">Historical endpoints</option>
           <option value="params">Historical parameters</option>
           <option value="summary">Domain summary</option>
         </select></label>
+      <div class="check"><input type="checkbox" id="provenance"><span>Preserve one result per archive source</span></div>
       <label><span>Also write files to (blank = stream only)</span>
         <input type="text" id="outdir" placeholder="results"></label>
       <label><span>Format</span>
@@ -188,13 +190,21 @@
       source: val("source"), cc_index: val("cc_index") || "latest",
       cc_page_size: Number(val("cc_page_size")) || 5,
       cc_rps: Number(val("cc_rps")),
-      analysis: val("analysis")
+      analysis: val("analysis") === "source_summary" ? "" : val("analysis"),
+      source_summary: val("analysis") === "source_summary",
+      provenance: on("provenance")
     };
   }
 
   function handle(ev) {
-    if (ev.type === "url") addResult(ev.url);
+    if (ev.type === "url") {
+      if (on("provenance") && ev.source) addResult(JSON.stringify({
+        domain: ev.domain, url: ev.url, source: ev.source
+      }));
+      else addResult(ev.url);
+    }
     else if (ev.type === "analysis") addResult(ev.text);
+    else if (ev.type === "source_summary") addResult(ev.text);
     else if (ev.type === "start") msg(
       "Searching " + ev.domains.join(", ") + " via " + (ev.sources || ["wayback"]).join(", ") + " …");
     else if (ev.type === "stats") msg(
@@ -244,14 +254,41 @@
   function syncSourceControls() {
     const source = val("source");
     const usesCc = source.includes("commoncrawl");
+    const multiSource = source.includes(",");
     $("cc_index").disabled = !usesCc;
     $("cc_page_size").disabled = !usesCc;
     $("cc_rps").disabled = !usesCc;
-    const analysisAllowed = source === "wayback";
-    if (!analysisAllowed) $("analysis").value = "";
-    $("analysis").disabled = !analysisAllowed;
+
+    const view = $("analysis");
+    for (const option of view.options) {
+      if (["history", "params", "summary"].includes(option.value)) {
+        option.disabled = source !== "wayback";
+      } else if (option.value === "source_summary") {
+        option.disabled = !multiSource;
+      }
+    }
+    if (view.selectedOptions[0] && view.selectedOptions[0].disabled) view.value = "";
+    syncModeControls();
   }
+
+  function syncModeControls() {
+    const mode = val("analysis");
+    const historical = ["history", "params", "summary"].includes(mode);
+    const sourceSummary = mode === "source_summary";
+    $("provenance").disabled = historical || sourceSummary;
+    if ($("provenance").disabled) $("provenance").checked = false;
+
+    if (on("provenance")) {
+      $("format").value = "jsonl";
+      $("format").disabled = true;
+    } else {
+      $("format").disabled = false;
+    }
+  }
+
   $("source").addEventListener("change", syncSourceControls);
+  $("analysis").addEventListener("change", syncModeControls);
+  $("provenance").addEventListener("change", syncModeControls);
   syncSourceControls();
 
   $("copy").addEventListener("click", async () => {
@@ -266,7 +303,8 @@
     a.href = URL.createObjectURL(blob);
     const mode = val("analysis");
     const extension = val("format") === "jsonl" ? "jsonl" : "txt";
-    a.download = mode ? ("wayparam." + mode + "." + extension) : ("wayparam." + extension);
+    const suffix = mode || (on("provenance") ? "provenance" : "");
+    a.download = suffix ? ("wayparam." + suffix + "." + extension) : ("wayparam." + extension);
     a.click();
     URL.revokeObjectURL(a.href);
   });
