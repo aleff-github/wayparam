@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.1
+- Fixed Historical Intelligence aborting on malformed archived URLs such as invalid bracketed hosts; unusable captures are now skipped instead of failing the whole domain
+- Fixed Common Crawl async-generator shutdown errors when a bounded run or consumer stops early by explicitly closing nested streams on Python 3.9+
+
 ## 0.6.0
 - Added archive provider abstraction with Wayback remaining the default source
 - Added Common Crawl CDXJ URL discovery via `--source commoncrawl`
