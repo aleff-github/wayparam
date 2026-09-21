@@ -12,6 +12,7 @@ wayparam -d example.com --summary
 wayparam -d example.com --timeline
 wayparam -d example.com --changes 2020 2024
 wayparam -d example.com --topology
+wayparam -d example.com --cooccurrence
 ```
 
 They work with the normal filtering, date-range, subdomain, proxy, rate-limit
@@ -186,6 +187,29 @@ on different subdomains are not merged. Parameter-set variants describe archive
 observations only and do not imply which parameters are required by a current
 live endpoint.
 
+## `--cooccurrence`
+
+This view emits one deterministic record for each unordered pair of query
+parameter names observed together on the same normalized endpoint variant.
+
+Each record reports:
+
+- the two parameter names
+- number of normalized URL variants containing the pair
+- number of distinct host/path routes containing the pair
+- represented accepted capture count
+- first/last seen timestamps
+
+Example:
+
+```bash
+wayparam -d example.com --cooccurrence --format jsonl --stdout --no-files
+```
+
+Pairs are descriptive archive-index evidence only. Their presence or frequency
+does not imply dependency between parameters, exploitability or current live
+behavior.
+
 ## Output files
 
 When files are enabled, analysis views do not overwrite the normal URL output.
@@ -198,6 +222,7 @@ results/example.com.summary.txt
 results/example.com.timeline.txt
 results/example.com.changes.txt
 results/example.com.topology.txt
+results/example.com.cooccurrence.txt
 ```
 
 With `--format jsonl`, the extension is `.jsonl`.
