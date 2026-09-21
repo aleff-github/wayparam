@@ -28,7 +28,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from .. import __version__
 from ..analysis import format_record, records_for, run_history, write_analysis_files
-from ..config import AnalysisMode, RunConfig, build_filter_options
+from ..config import AnalysisMode, RunConfig, TimelineGranularity, build_filter_options
 from ..core import run
 from ..http import HttpConfig
 from ..io import parse_domains
@@ -77,10 +77,16 @@ def config_from_request(data: dict) -> RunConfig:
     raw_analysis = str(data.get("analysis", "") or "").strip()
     analysis = cast(
         Optional[AnalysisMode],
-        raw_analysis if raw_analysis in ("history", "params", "summary") else None,
+        raw_analysis if raw_analysis in ("history", "params", "summary", "timeline") else None,
     )
     if analysis and sources != ("wayback",):
         raise Rejected(400, "Historical analysis currently supports Wayback only.")
+
+    raw_timeline_granularity = str(data.get("timeline_granularity", "year") or "year").strip()
+    timeline_granularity = cast(
+        TimelineGranularity,
+        raw_timeline_granularity if raw_timeline_granularity in ("year", "month") else "year",
+    )
 
     provenance = bool(data.get("provenance"))
     source_summary = bool(data.get("source_summary"))
@@ -117,6 +123,7 @@ def config_from_request(data: dict) -> RunConfig:
         write_files=write_files,
         out_format="jsonl" if data.get("format") == "jsonl" else "txt",
         analysis=analysis,
+        timeline_granularity=timeline_granularity,
         provenance=provenance,
         source_summary=source_summary,
         concurrency=_int("concurrency", 6, 1, 64),
@@ -290,6 +297,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     "domains": cfg.domains,
                     "sources": list(cfg.sources),
                     "analysis": cfg.analysis,
+                    "timeline_granularity": cfg.timeline_granularity,
                     "provenance": cfg.provenance,
                     "source_summary": cfg.source_summary,
                 }
@@ -317,7 +325,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     history = history_result.analyses.get(domain)
                     if history is None:
                         continue
-                    for record in records_for(history, cfg.analysis):
+                    for record in records_for(
+                        history,
+                        cfg.analysis,
+                        timeline_granularity=cfg.timeline_granularity,
+                    ):
                         chunk(
                             {
                                 "type": "analysis",
