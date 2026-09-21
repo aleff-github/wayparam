@@ -1,0 +1,41 @@
+name: Bootstrap v0.6.1 release
+
+on:
+  push:
+    branches:
+      - release-bootstrap-v0.6.1
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  tag-and-dispatch:
+    runs-on: ubuntu-latest
+    env:
+      TAG: v0.6.1
+      TARGET_SHA: b12bebad15463f29a0bc5312a2aaa4a629c7f16a
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Create annotated release tag
+        run: |
+          set -euo pipefail
+          git fetch origin main --tags
+          test "$(git rev-parse "$TARGET_SHA^{commit}")" = "$TARGET_SHA"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" "$TARGET_SHA" -m "$TAG"
+          git push origin "refs/tags/$TAG"
+      - name: Dispatch official release workflow at the tag
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 10); do
+            if gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG"; then
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
