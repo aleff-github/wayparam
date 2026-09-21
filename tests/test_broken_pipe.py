@@ -184,9 +184,7 @@ def test_timeline_granularity_reaches_the_config():
 
 def test_changes_reach_the_config():
     parser = cli.build_arg_parser()
-    cfg = cli.build_config(
-        parser.parse_args(["-d", "example.com", "--changes", "2020", "2024"])
-    )
+    cfg = cli.build_config(parser.parse_args(["-d", "example.com", "--changes", "2020", "2024"]))
     assert cfg.analysis == "changes"
     assert cfg.compare_periods == ("2020", "2024")
 
@@ -216,9 +214,7 @@ def test_analysis_views_are_mutually_exclusive():
 def test_changes_are_mutually_exclusive_with_other_analysis_modes():
     parser = cli.build_arg_parser()
     with pytest.raises(SystemExit) as exc:
-        parser.parse_args(
-            ["-d", "example.com", "--timeline", "--changes", "2020", "2024"]
-        )
+        parser.parse_args(["-d", "example.com", "--timeline", "--changes", "2020", "2024"])
     assert exc.value.code == 2
 
 
