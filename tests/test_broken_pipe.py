@@ -165,6 +165,7 @@ def test_exit_code_is_0_when_a_budget_stopped_the_run(monkeypatch):
         ("--params", "params"),
         ("--summary", "summary"),
         ("--timeline", "timeline"),
+        ("--topology", "topology"),
     ],
 )
 def test_analysis_flags_reach_the_config(flag, mode):
