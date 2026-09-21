@@ -128,6 +128,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Archive source(s) in priority order: wayback, commoncrawl "
         "(default: wayback). Combined sources are deduplicated.",
     )
+    p.add_argument(
+        "--provenance",
+        action="store_true",
+        help="Preserve one normalized JSONL record per archive source instead of "
+        "deduplicating the same endpoint across sources.",
+    )
 
     analysis = p.add_mutually_exclusive_group()
     analysis.add_argument(
@@ -370,6 +376,7 @@ def build_config(args: argparse.Namespace) -> RunConfig:
         write_files=not args.no_files,
         out_format=args.format,
         analysis=args.analysis,
+        provenance=args.provenance,
         max_results=max(0, args.max_results),
         concurrency=args.concurrency,
         rps=args.rps,
@@ -430,6 +437,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.no_files and not args.stdout:
         parser.error("--no-files requires --stdout")
+    if args.provenance and args.format != "jsonl":
+        parser.error("--provenance requires --format jsonl")
+    if args.provenance and args.analysis:
+        parser.error("--provenance cannot be combined with --history/--params/--summary")
 
     _setup_logging(args.verbose, args.quiet)
 

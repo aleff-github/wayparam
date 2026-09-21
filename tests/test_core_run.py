@@ -386,3 +386,83 @@ def test_one_source_can_fail_without_discarding_other_source_results(tmp_path, m
     assert result.stats[0].kept == 2
     assert result.stats[0].complete is False
     assert "wayback: archive unavailable" in str(result.errors[0][1])
+
+
+def test_provenance_mode_preserves_one_record_per_source(tmp_path, monkeypatch):
+    providers = [
+        _FakeProvider(
+            "wayback",
+            [
+                "https://example.com/shared?id=1",
+                "https://example.com/wayback-only?q=1",
+            ],
+        ),
+        _FakeProvider(
+            "commoncrawl",
+            [
+                "https://example.com/shared?id=2",
+                "https://example.com/cc-only?q=2",
+            ],
+        ),
+    ]
+    monkeypatch.setattr(core, "build_providers", lambda _cfg: providers)
+
+    seen = []
+    result = _run(
+        _cfg(
+            tmp_path,
+            write_files=False,
+            out_format="jsonl",
+            sources=("wayback", "commoncrawl"),
+            provenance=True,
+        ),
+        on_record=seen.append,
+    )
+
+    assert result.ok
+    assert [(record.url, record.source) for record in seen] == [
+        ("https://example.com/shared?id=FUZZ", "wayback"),
+        ("https://example.com/wayback-only?q=FUZZ", "wayback"),
+        ("https://example.com/shared?id=FUZZ", "commoncrawl"),
+        ("https://example.com/cc-only?q=FUZZ", "commoncrawl"),
+    ]
+    assert result.stats[0].fetched == 4
+    assert result.stats[0].kept == 4
+
+
+def test_provenance_mode_still_deduplicates_within_each_source(tmp_path, monkeypatch):
+    providers = [
+        _FakeProvider(
+            "wayback",
+            [
+                "https://example.com/shared?id=1",
+                "https://example.com/shared?id=2",
+            ],
+        ),
+        _FakeProvider(
+            "commoncrawl",
+            [
+                "https://example.com/shared?id=3",
+                "https://example.com/shared?id=4",
+            ],
+        ),
+    ]
+    monkeypatch.setattr(core, "build_providers", lambda _cfg: providers)
+
+    seen = []
+    result = _run(
+        _cfg(
+            tmp_path,
+            write_files=False,
+            out_format="jsonl",
+            sources=("wayback", "commoncrawl"),
+            provenance=True,
+        ),
+        on_record=seen.append,
+    )
+
+    assert result.ok
+    assert [(record.url, record.source) for record in seen] == [
+        ("https://example.com/shared?id=FUZZ", "wayback"),
+        ("https://example.com/shared?id=FUZZ", "commoncrawl"),
+    ]
