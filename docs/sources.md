@@ -26,6 +26,42 @@ When several sources are selected, wayparam processes them in the order given
 and deduplicates normalized URLs across providers. In JSONL, `source` is the
 provider that discovered that normalized URL first.
 
+## Provenance and source overlap
+
+Use provenance mode when the fact that multiple archives observed the same
+normalized endpoint is itself useful evidence:
+
+```bash
+wayparam -d example.com \
+  --source wayback,commoncrawl \
+  --provenance --format jsonl --stdout --no-files
+```
+
+The default cross-provider deduplication is unchanged. `--provenance` instead
+keeps one normalized record per source, while still deduplicating repeated
+variants inside each source.
+
+For aggregate coverage intelligence, use:
+
+```bash
+wayparam -d example.com \
+  --source wayback,commoncrawl \
+  --source-summary --format jsonl --stdout --no-files
+```
+
+A source summary reports:
+
+- `union_urls`: normalized URLs observed by at least one selected source;
+- `source_counts`: unique normalized URLs observed by each source;
+- `exclusive_counts`: URLs observed by exactly that source and no other;
+- `shared_urls`: URLs observed by at least two selected sources;
+- `overlap_urls`: URLs observed by every selected source;
+- `complete`: false when a failure or `--max-results` stopped collection early.
+
+`--source-summary` requires at least two sources. Its `--max-results` budget
+counts per-source evidence records before aggregation, so bounded results should
+not be interpreted as complete archive coverage.
+
 ## Common Crawl indexes
 
 Common Crawl publishes separate CDXJ indexes for individual crawls. There is no
