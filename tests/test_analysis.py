@@ -228,8 +228,7 @@ def test_cooccurrence_counts_pairs_routes_urls_and_captures():
     )
 
     records = {
-        tuple(record["parameters"]): record
-        for record in records_for(history, "cooccurrence")
+        tuple(record["parameters"]): record for record in records_for(history, "cooccurrence")
     }
 
     assert records[("id", "lang")] == {
