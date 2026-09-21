@@ -8,8 +8,8 @@ import json
 import httpx
 import pytest
 
-from wayparam.http import HttpConfig
 import wayparam.providers.commoncrawl as commoncrawl_module
+from wayparam.http import HttpConfig
 from wayparam.providers.commoncrawl import (
     CommonCrawlOptions,
     CommonCrawlProvider,
