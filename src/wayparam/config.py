@@ -20,7 +20,9 @@ from .output import OutputFormat
 from .providers import CommonCrawlOptions, SourceName
 from .wayback import CdxOptions
 
-AnalysisMode = Literal["history", "params", "summary", "timeline", "changes", "topology", "cooccurrence"]
+AnalysisMode = Literal[
+    "history", "params", "summary", "timeline", "changes", "topology", "cooccurrence"
+]
 TimelineGranularity = Literal["year", "month"]
 
 
