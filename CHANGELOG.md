@@ -3,6 +3,7 @@
 ## Unreleased
 - Added JSONL-only `--report` evidence bundles with the versioned `wayparam-evidence-report/v1` schema, combining summary, endpoint history, parameter history, timeline, topology and co-occurrence from one Wayback metadata pass
 - Added optional `--report-changes BASELINE COMPARISON` to include temporal change evidence in the same report bundle
+- Exposed versioned evidence reports in the local web UI with forced JSONL output and optional period-change evidence
 
 ## 0.9.0
 - Added `--topology` historical surface topology analysis, grouping archive evidence by host/path with observed schemes, normalized URL variants, parameter unions and deterministic parameter-set variants
