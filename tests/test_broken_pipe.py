@@ -280,3 +280,44 @@ def test_historical_analysis_rejects_non_wayback_sources(capsys):
         )
     assert exc.value.code == 2
     assert "currently require --source wayback" in capsys.readouterr().err
+
+
+def test_provenance_flag_reaches_the_config():
+    parser = cli.build_arg_parser()
+    cfg = cli.build_config(
+        parser.parse_args(
+            [
+                "-d",
+                "example.com",
+                "--source",
+                "wayback,commoncrawl",
+                "--format",
+                "jsonl",
+                "--provenance",
+            ]
+        )
+    )
+    assert cfg.provenance is True
+
+
+def test_provenance_requires_jsonl(capsys):
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["-d", "example.com", "--provenance"])
+    assert exc.value.code == 2
+    assert "--provenance requires --format jsonl" in capsys.readouterr().err
+
+
+def test_provenance_rejects_historical_analysis(capsys):
+    with pytest.raises(SystemExit) as exc:
+        cli.main(
+            [
+                "-d",
+                "example.com",
+                "--format",
+                "jsonl",
+                "--provenance",
+                "--history",
+            ]
+        )
+    assert exc.value.code == 2
+    assert "--provenance cannot be combined" in capsys.readouterr().err
