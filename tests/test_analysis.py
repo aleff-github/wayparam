@@ -188,3 +188,35 @@ def test_analysis_files_use_mode_specific_names(tmp_path):
     record = json.loads(path.read_text(encoding="utf-8").strip())
     assert record["type"] == "summary"
     assert record["unique_urls"] == 2
+
+
+def test_history_skips_malformed_archived_urls_and_keeps_processing(tmp_path):
+    page = "\n".join(
+        [
+            "20200101000000 200 text/html https://[example.com]/bad.php?id=1",
+            "20210101000000 200 text/html https://example.com/good.php?id=2",
+        ]
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text=page)
+
+    transport = httpx.MockTransport(handler)
+    real_client = analysis.httpx.AsyncClient
+
+    def patched(**kwargs):
+        kwargs.pop("proxy", None)
+        kwargs.pop("proxies", None)
+        return real_client(transport=transport, **kwargs)
+
+    analysis.httpx.AsyncClient = patched  # type: ignore[assignment]
+    try:
+        result = asyncio.run(run_history(_cfg(tmp_path, max_results=1)))
+    finally:
+        analysis.httpx.AsyncClient = real_client  # type: ignore[assignment]
+
+    assert result.ok
+    history = result.analyses["example.com"]
+    assert history.fetched == 2
+    assert history.accepted == 1
+    assert list(history.endpoints) == ["https://example.com/good.php?id=FUZZ"]
