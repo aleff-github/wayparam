@@ -95,7 +95,6 @@ def test_summary_is_one_record_per_domain():
     assert record["status_codes"] == {"200": 2, "302": 1}
 
 
-
 def test_timeline_year_view_reports_activity_and_first_seen_counts():
     records = {record["period"]: record for record in records_for(_history(), "timeline")}
 
