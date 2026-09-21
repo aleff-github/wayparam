@@ -147,6 +147,7 @@ async def _process_domain(
     complete = True
     errors: list[Exception] = []
     seen: set[int] = set()
+    seen_by_source: set[tuple[str, int]] = set()
 
     out_fh = (
         open_outfile(_outfile_for(cfg.outdir, domain, cfg.out_format)) if cfg.write_files else None
@@ -175,9 +176,15 @@ async def _process_domain(
                         continue
 
                     fp = fingerprint(canon)
-                    if fp in seen:
-                        continue
-                    seen.add(fp)
+                    if cfg.provenance:
+                        source_key = (item.source, fp)
+                        if source_key in seen_by_source:
+                            continue
+                        seen_by_source.add(source_key)
+                    else:
+                        if fp in seen:
+                            continue
+                        seen.add(fp)
 
                     if not budget.take():
                         complete = False
