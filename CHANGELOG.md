@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9.0
 - Added `--topology` historical surface topology analysis, grouping archive evidence by host/path with observed schemes, normalized URL variants, parameter unions and deterministic parameter-set variants
 - Added `--cooccurrence` to report unordered parameter pairs observed together, with normalized URL, route, capture and first/last-seen evidence
 - Exposed surface topology and parameter co-occurrence in the local web UI using the shared historical-analysis core
