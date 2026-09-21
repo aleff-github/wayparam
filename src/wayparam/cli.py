@@ -25,13 +25,13 @@ from .http import HttpConfig
 from .io import normalize_domain, read_domains
 from .normalize import NormalizeOptions
 from .output import UrlRecord, print_hint_stderr, print_record_stdout
+from .providers import CommonCrawlOptions, SourceName, parse_source_names
 from .source_analysis import (
     SourceSummaryRunResult,
     format_source_summary,
     run_source_summary,
     write_source_summary_files,
 )
-from .providers import CommonCrawlOptions, SourceName, parse_source_names
 from .wayback import PAGINATION_MODES, CdxOptions
 
 log = logging.getLogger("wayparam")
