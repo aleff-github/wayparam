@@ -173,13 +173,10 @@ def test_analysis_flags_reach_the_config(flag, mode):
     assert cfg.analysis == mode
 
 
-
 def test_timeline_granularity_reaches_the_config():
     parser = cli.build_arg_parser()
     cfg = cli.build_config(
-        parser.parse_args(
-            ["-d", "example.com", "--timeline", "--timeline-granularity", "month"]
-        )
+        parser.parse_args(["-d", "example.com", "--timeline", "--timeline-granularity", "month"])
     )
     assert cfg.analysis == "timeline"
     assert cfg.timeline_granularity == "month"
