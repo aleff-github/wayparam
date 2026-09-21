@@ -1,3 +1,16 @@
+wayparam (0.8.0-1) noble; urgency=medium
+
+  * New upstream release.
+  * Add Temporal Surface Intelligence with deterministic yearly/monthly
+    archive timelines for normalized URL and parameter activity.
+  * Add archive period comparisons with added, removed and persisted
+    classifications for normalized URL shapes and parameter names.
+  * Expose temporal timelines and period comparisons in the local web UI.
+  * Keep all temporal classifications explicitly scoped to archive-index
+    evidence rather than live-target state.
+
+ -- Aleff <alessandro.greco.1@protonmail.com>  Mon, 21 Sep 2026 16:15:00 +0200
+
 wayparam (0.7.0-1) noble; urgency=medium
 
   * New upstream release.
