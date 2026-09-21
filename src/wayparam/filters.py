@@ -64,7 +64,15 @@ class FilterOptions:
 
 
 def is_boring(url: str, opt: FilterOptions) -> bool:
-    path = urlsplit(url).path
+    # Archive indexes contain malformed historical URLs too. urllib validates
+    # bracketed hosts such as https://[example.com]/ as IP literals and raises
+    # ValueError for invalid ones. Drop unusable URLs instead of aborting the
+    # whole domain.
+    try:
+        path = urlsplit(url).path
+    except ValueError:
+        return True
+
     ext = PurePosixPath(path).suffix.lower()
 
     if ext:
