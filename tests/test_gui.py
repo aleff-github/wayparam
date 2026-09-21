@@ -52,6 +52,7 @@ def test_defaults_match_the_cli():
     assert cfg.cdx.collapse == "urlkey"
     assert cfg.sources == ("wayback",)
     assert cfg.commoncrawl.indexes == ("latest",)
+    assert cfg.timeline_granularity == "year"
 
 
 def test_source_selection_and_commoncrawl_options():
@@ -95,7 +96,32 @@ def test_analysis_mode_is_sanitized():
     assert (
         config_from_request({"domains": "example.com", "analysis": "summary"}).analysis == "summary"
     )
+    assert (
+        config_from_request({"domains": "example.com", "analysis": "timeline"}).analysis
+        == "timeline"
+    )
     assert config_from_request({"domains": "example.com", "analysis": "other"}).analysis is None
+
+
+def test_timeline_granularity_reaches_gui_config():
+    monthly = config_from_request(
+        {
+            "domains": "example.com",
+            "analysis": "timeline",
+            "timeline_granularity": "month",
+        }
+    )
+    assert monthly.analysis == "timeline"
+    assert monthly.timeline_granularity == "month"
+
+    invalid = config_from_request(
+        {
+            "domains": "example.com",
+            "analysis": "timeline",
+            "timeline_granularity": "quarter",
+        }
+    )
+    assert invalid.timeline_granularity == "year"
 
 
 def test_files_are_only_written_when_an_outdir_is_given(tmp_path: Path):
@@ -359,6 +385,54 @@ def test_historical_summary_is_streamed_as_analysis_event(server, monkeypatch):
     assert events[1]["mode"] == "summary"
     assert events[1]["record"]["type"] == "summary"
     assert events[1]["record"]["unique_urls"] == 1
+
+
+def test_timeline_is_streamed_with_requested_granularity(server, monkeypatch):
+    port, token = server
+
+    async def fake_history(cfg, *, on_progress=None):
+        history = DomainHistory(domain=cfg.domains[0], fetched=2)
+        history.add(
+            "https://example.com/?id=FUZZ",
+            CaptureRecord(
+                original="https://example.com/?id=1",
+                timestamp="20240102030405",
+                status_code="200",
+                mime_type="text/html",
+            ),
+        )
+        history.add(
+            "https://example.com/search?q=FUZZ",
+            CaptureRecord(
+                original="https://example.com/search?q=test",
+                timestamp="20240203040506",
+                status_code="200",
+                mime_type="text/html",
+            ),
+        )
+        return HistoryRunResult(
+            stats=[DomainStats(cfg.domains[0], fetched=2, kept=2)],
+            analyses={cfg.domains[0]: history},
+        )
+
+    monkeypatch.setattr("wayparam.gui.server.run_history", fake_history)
+    events = _stream(
+        port,
+        token,
+        {
+            "domains": "example.com",
+            "analysis": "timeline",
+            "timeline_granularity": "month",
+            "format": "jsonl",
+        },
+    )
+
+    analyses = [event for event in events if event["type"] == "analysis"]
+    assert events[0]["timeline_granularity"] == "month"
+    assert [event["mode"] for event in analyses] == ["timeline", "timeline"]
+    assert [event["record"]["period"] for event in analyses] == ["202401", "202402"]
+    assert analyses[0]["record"]["new_urls"] == 1
+    assert analyses[1]["record"]["new_parameters"] == 1
 
 
 def test_gui_provenance_reaches_config():
