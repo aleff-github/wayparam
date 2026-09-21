@@ -171,6 +171,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Aggregate accepted historical evidence into year/month time buckets.",
     )
     analysis.add_argument(
+        "--topology",
+        dest="analysis",
+        action="store_const",
+        const="topology",
+        help="Group archived endpoint variants by host/path and parameter-set structure.",
+    )
+    analysis.add_argument(
         "--changes",
         nargs=2,
         metavar=("BASELINE", "COMPARISON"),
@@ -510,7 +517,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if cfg.analysis and cfg.sources != ("wayback",):
         parser.error(
-            "--history/--params/--summary/--timeline/--changes currently require --source wayback"
+            "--history/--params/--summary/--timeline/--changes/--topology currently require --source wayback"
         )
     if cfg.source_summary and len(cfg.sources) < 2:
         parser.error("--source-summary requires at least two archive sources")
