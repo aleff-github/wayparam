@@ -3,13 +3,14 @@
 wayparam can aggregate capture-level metadata from the Wayback CDX API instead
 of returning only normalized URLs.
 
-The four analysis views are mutually exclusive:
+The five analysis views are mutually exclusive:
 
 ```bash
 wayparam -d example.com --history
 wayparam -d example.com --params
 wayparam -d example.com --summary
 wayparam -d example.com --timeline
+wayparam -d example.com --changes 2020 2024
 ```
 
 They work with the normal filtering, date-range, subdomain, proxy, rate-limit
@@ -129,6 +130,34 @@ A timeline describes archive-index evidence, not whether an endpoint is still
 deployed or reachable today. Date filters such as `--from` and `--to` apply
 before the aggregation.
 
+## `--changes BASELINE COMPARISON`
+
+This view compares two archive buckets. Both arguments must use the same form:
+either `YYYY` or `YYYYMM`, and the baseline must be earlier than the
+comparison period.
+
+The first record is a summary containing baseline/comparison totals and counts
+of added, removed and persisted normalized URLs and parameter names. It is
+followed by deterministic detail records for each URL and parameter.
+
+Examples:
+
+```bash
+wayparam -d example.com --changes 2020 2024 --format jsonl --stdout --no-files
+wayparam -d example.com --changes 202401 202501
+```
+
+The classifications describe **archive evidence only**:
+
+- `added`: observed in the comparison bucket but not the baseline bucket;
+- `removed`: observed in the baseline bucket but not the comparison bucket;
+- `persisted`: observed in both buckets.
+
+In particular, `removed` does not establish that an endpoint was deleted from
+the live site. Sparse archive coverage can also affect all three categories.
+`--from`, `--to` and `--max-results` are applied before the comparison,
+so restrictive or bounded runs should be interpreted as partial evidence.
+
 ## Output files
 
 When files are enabled, analysis views do not overwrite the normal URL output.
@@ -139,6 +168,7 @@ results/example.com.history.txt
 results/example.com.params.txt
 results/example.com.summary.txt
 results/example.com.timeline.txt
+results/example.com.changes.txt
 ```
 
 With `--format jsonl`, the extension is `.jsonl`.

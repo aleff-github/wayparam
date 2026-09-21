@@ -226,7 +226,16 @@ wayparam -d example.com --timeline --timeline-granularity month --format jsonl -
 
 Each bucket reports accepted captures, normalized URLs observed in that period, URLs first observed in that period, parameter names observed, and parameter names first observed. The default granularity is `year`.
 
-Historical modes retrieve capture metadata and automatically disable CDX collapse so that first/last seen, capture counts and timeline activity are meaningful. They can therefore transfer substantially more data than a normal URL run; use `--from`, `--to`, filters or `--max-results` to bound the analysis.
+### 14) Compare two historical periods
+
+```bash
+wayparam -d example.com --changes 2020 2024 --format jsonl --stdout --no-files
+wayparam -d example.com --changes 202401 202501
+```
+
+`--changes` compares two periods at the same granularity and reports a summary plus deterministic URL/parameter records classified as `added`, `removed` or `persisted`. Here, `removed` means “observed in the baseline archive bucket but not in the comparison bucket”; it does **not** prove that the endpoint or parameter disappeared from the live site.
+
+Historical modes retrieve capture metadata and automatically disable CDX collapse so that first/last seen, capture counts and temporal activity are meaningful. They can therefore transfer substantially more data than a normal URL run; use `--from`, `--to`, filters or `--max-results` to bound the analysis.
 
 ---
 
@@ -319,6 +328,7 @@ See [Archive sources](docs/sources.md) for provider behavior and caveats.
 * `--summary` — one historical summary record per domain
 * `--timeline` — aggregate archived endpoint/parameter activity into time buckets
 * `--timeline-granularity year|month` — choose timeline bucket size (default: year)
+* `--changes BASELINE COMPARISON` — compare two YYYY or YYYYMM archive buckets
 
 These views are mutually exclusive. In historical modes, `--max-results` caps accepted capture rows before aggregation.
 

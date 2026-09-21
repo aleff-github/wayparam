@@ -20,7 +20,7 @@ from .output import OutputFormat
 from .providers import CommonCrawlOptions, SourceName
 from .wayback import CdxOptions
 
-AnalysisMode = Literal["history", "params", "summary", "timeline"]
+AnalysisMode = Literal["history", "params", "summary", "timeline", "changes"]
 TimelineGranularity = Literal["year", "month"]
 
 
@@ -34,6 +34,8 @@ class RunConfig:
     analysis: AnalysisMode | None = None
     #: Time bucket used by the temporal timeline analysis.
     timeline_granularity: TimelineGranularity = "year"
+    #: Two YYYY or YYYYMM buckets compared by temporal change analysis.
+    compare_periods: tuple[str, str] | None = None
     #: Preserve one normalized record per archive source instead of globally deduplicating.
     provenance: bool = False
     #: Aggregate provider overlap/exclusive coverage instead of emitting URLs.
@@ -49,6 +51,19 @@ class RunConfig:
     filters: FilterOptions = field(
         default_factory=lambda: FilterOptions(ext_blacklist=set(DEFAULT_EXT_BLACKLIST))
     )
+
+
+def validate_compare_periods(periods: tuple[str, str]) -> tuple[str, str]:
+    """Validate an ordered pair of YYYY or YYYYMM archive periods."""
+    baseline, comparison = periods
+    pattern = re.compile(r"(?:\d{4}|\d{4}(?:0[1-9]|1[0-2]))")
+    if not pattern.fullmatch(baseline) or not pattern.fullmatch(comparison):
+        raise ValueError("change periods must use YYYY or YYYYMM")
+    if len(baseline) != len(comparison):
+        raise ValueError("change periods must use the same granularity")
+    if baseline >= comparison:
+        raise ValueError("change baseline must be earlier than comparison")
+    return baseline, comparison
 
 
 def build_filter_options(

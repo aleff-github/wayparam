@@ -19,7 +19,7 @@ from .analysis import (
     run_history,
     write_analysis_files,
 )
-from .config import RunConfig, build_filter_options
+from .config import AnalysisMode, RunConfig, build_filter_options, validate_compare_periods
 from .core import RunResult, run
 from .http import HttpConfig
 from .io import normalize_domain, read_domains
@@ -169,6 +169,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         action="store_const",
         const="timeline",
         help="Aggregate accepted historical evidence into year/month time buckets.",
+    )
+    analysis.add_argument(
+        "--changes",
+        nargs=2,
+        metavar=("BASELINE", "COMPARISON"),
+        help="Compare archive evidence between two YYYY or YYYYMM periods.",
     )
     analysis.add_argument(
         "--source-summary",
@@ -395,14 +401,24 @@ def build_config(args: argparse.Namespace) -> RunConfig:
     else:
         domains = read_domains(args.list)
 
+    compare_periods = (
+        validate_compare_periods((args.changes[0], args.changes[1])) if args.changes else None
+    )
+    analysis_mode: AnalysisMode | None
+    if compare_periods:
+        analysis_mode = "changes"
+    else:
+        analysis_mode = args.analysis
+
     return RunConfig(
         domains=domains,
         sources=args.source,
         outdir=Path(args.outdir),
         write_files=not args.no_files,
         out_format=args.format,
-        analysis=args.analysis,
+        analysis=analysis_mode,
         timeline_granularity=args.timeline_granularity,
+        compare_periods=compare_periods,
         provenance=args.provenance,
         source_summary=args.source_summary,
         max_results=max(0, args.max_results),
@@ -471,7 +487,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--no-files requires --stdout")
     if args.provenance and args.format != "jsonl":
         parser.error("--provenance requires --format jsonl")
-    if args.provenance and args.analysis:
+    if args.provenance and (args.analysis or args.changes):
         parser.error("--provenance cannot be combined with historical analysis modes")
     if args.provenance and args.source_summary:
         parser.error("--provenance cannot be combined with --source-summary")
@@ -486,12 +502,16 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(f"invalid --exclude-path-regex: {exc}")
     except OSError as exc:
         parser.error(f"cannot read the domain list: {exc}")
+    except ValueError as exc:
+        parser.error(str(exc))
 
     if not cfg.domains:
         parser.error("no domains to process")
 
     if cfg.analysis and cfg.sources != ("wayback",):
-        parser.error("--history/--params/--summary/--timeline currently require --source wayback")
+        parser.error(
+            "--history/--params/--summary/--timeline/--changes currently require --source wayback"
+        )
     if cfg.source_summary and len(cfg.sources) < 2:
         parser.error("--source-summary requires at least two archive sources")
 
@@ -541,6 +561,7 @@ def main(argv: list[str] | None = None) -> int:
                         history,
                         cfg.analysis,
                         timeline_granularity=cfg.timeline_granularity,
+                        compare_periods=cfg.compare_periods,
                     ):
                         print(format_record(record, cfg.out_format), flush=True)
             return _report(history_result, cfg, args.stats)
