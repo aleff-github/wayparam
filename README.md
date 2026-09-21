@@ -201,7 +201,7 @@ By default, the first configured provider wins when the same normalized URL appe
 wayparam -d example.com --source wayback,commoncrawl --source-summary --format jsonl --stdout --no-files
 ```
 
-`--source-summary` reports the normalized-URL union, per-source counts, source-exclusive counts, URLs shared by at least two sources, and the intersection present in every selected source. It requires at least two archive sources. When `--max-results` is used, the cap applies to per-source evidence records consumed by the summary, so a capped summary is marked incomplete.
+`--source-summary` reports the normalized-URL union, per-source counts, source-exclusive counts, URLs shared by at least two sources, and the intersection present in every selected source. It requires at least two archive sources. When `--max-results` is used, the same cap is applied independently to each selected source, preventing an earlier provider from exhausting the whole comparison budget. A capped summary is still marked incomplete and should be treated as a bounded sample, not complete archive coverage.
 
 ### 11) Historical endpoint intelligence
 
