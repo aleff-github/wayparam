@@ -53,6 +53,19 @@ class RunConfig:
     )
 
 
+def validate_compare_periods(periods: tuple[str, str]) -> tuple[str, str]:
+    """Validate an ordered pair of YYYY or YYYYMM archive periods."""
+    baseline, comparison = periods
+    pattern = re.compile(r"(?:\d{4}|\d{4}(?:0[1-9]|1[0-2]))")
+    if not pattern.fullmatch(baseline) or not pattern.fullmatch(comparison):
+        raise ValueError("change periods must use YYYY or YYYYMM")
+    if len(baseline) != len(comparison):
+        raise ValueError("change periods must use the same granularity")
+    if baseline >= comparison:
+        raise ValueError("change baseline must be earlier than comparison")
+    return baseline, comparison
+
+
 def build_filter_options(
     ext_blacklist: str | None = None,
     ext_whitelist: str | None = None,
