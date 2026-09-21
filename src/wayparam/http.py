@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import random
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 
 import httpx
@@ -52,7 +52,7 @@ async def iter_lines(
     params: list[tuple[str, str]] | None = None,
     config: HttpConfig,
     empty_statuses: set[int] | None = None,
-) -> AsyncIterator[str]:
+) -> AsyncGenerator[str, None]:
     """Yield the response's non-empty lines as they arrive.
 
     A single CDX block page runs to tens of megabytes, and buffering one costs
