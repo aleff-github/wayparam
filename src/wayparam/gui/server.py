@@ -85,20 +85,30 @@ def config_from_request(data: dict) -> RunConfig:
         Optional[AnalysisMode],
         raw_analysis
         if raw_analysis
-        in ("history", "params", "summary", "timeline", "changes", "topology", "cooccurrence")
+        in (
+            "history",
+            "params",
+            "summary",
+            "timeline",
+            "changes",
+            "topology",
+            "cooccurrence",
+            "report",
+        )
         else None,
     )
     if analysis and sources != ("wayback",):
         raise Rejected(400, "Historical analysis currently supports Wayback only.")
 
     compare_periods: tuple[str, str] | None = None
-    if analysis == "changes":
+    if analysis in ("changes", "report"):
         baseline = str(data.get("change_baseline", "") or "").strip()
         comparison = str(data.get("change_comparison", "") or "").strip()
-        try:
-            compare_periods = validate_compare_periods((baseline, comparison))
-        except ValueError as exc:
-            raise Rejected(400, str(exc)) from None
+        if analysis == "changes" or baseline or comparison:
+            try:
+                compare_periods = validate_compare_periods((baseline, comparison))
+            except ValueError as exc:
+                raise Rejected(400, str(exc)) from None
 
     raw_timeline_granularity = str(data.get("timeline_granularity", "year") or "year").strip()
     timeline_granularity = cast(
@@ -108,6 +118,8 @@ def config_from_request(data: dict) -> RunConfig:
 
     provenance = bool(data.get("provenance"))
     source_summary = bool(data.get("source_summary"))
+    if analysis == "report" and data.get("format") != "jsonl":
+        raise Rejected(400, "Evidence reports require JSONL output.")
     if provenance and data.get("format") != "jsonl":
         raise Rejected(400, "Provenance requires JSONL output.")
     if provenance and source_summary:
@@ -341,15 +353,19 @@ class Handler(http.server.BaseHTTPRequestHandler):
             elif cfg.analysis:
                 history_result = asyncio.run(run_history(cfg))
                 write_analysis_files(history_result, cfg, cfg.analysis)
+                stats_by_domain = {item.domain: item for item in history_result.stats}
                 for domain in cfg.domains:
                     history = history_result.analyses.get(domain)
                     if history is None:
                         continue
+                    domain_stats = stats_by_domain.get(domain)
                     for record in records_for(
                         history,
                         cfg.analysis,
                         timeline_granularity=cfg.timeline_granularity,
                         compare_periods=cfg.compare_periods,
+                        report_complete=domain_stats.complete if domain_stats else None,
+                        report_bounded=cfg.max_results > 0,
                     ):
                         chunk(
                             {
