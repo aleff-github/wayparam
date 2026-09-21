@@ -84,6 +84,8 @@ def config_from_request(data: dict) -> RunConfig:
 
     provenance = bool(data.get("provenance"))
     source_summary = bool(data.get("source_summary"))
+    if provenance and data.get("format") != "jsonl":
+        raise Rejected(400, "Provenance requires JSONL output.")
     if provenance and source_summary:
         raise Rejected(400, "Provenance and source summary are mutually exclusive.")
     if provenance and analysis:
