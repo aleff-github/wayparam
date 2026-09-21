@@ -130,6 +130,84 @@ def test_text_timeline_output_is_tab_separated():
     assert encoded.split("\t") == ["2020", "1", "1", "1", "2", "2"]
 
 
+def _change_history() -> DomainHistory:
+    history = DomainHistory(domain="example.com")
+    captures = [
+        ("https://example.com/persist?id=FUZZ", "20200101000000", "id"),
+        ("https://example.com/legacy?legacy=FUZZ", "20200102000000", "legacy"),
+        ("https://example.com/persist?id=FUZZ", "20210101000000", "id"),
+        ("https://example.com/new?q=FUZZ", "20210102000000", "q"),
+    ]
+    for url, timestamp, parameter in captures:
+        history.add(
+            url,
+            CaptureRecord(
+                original=f"https://example.com/?{parameter}=1",
+                timestamp=timestamp,
+                status_code="200",
+                mime_type="text/html",
+            ),
+        )
+    history.fetched = len(captures)
+    return history
+
+
+def test_changes_report_added_removed_and_persisted_entities():
+    records = records_for(
+        _change_history(),
+        "changes",
+        compare_periods=("2020", "2021"),
+    )
+
+    summary = records[0]
+    assert summary["type"] == "change_summary"
+    assert summary["granularity"] == "year"
+    assert summary["urls"] == {
+        "baseline": 2,
+        "comparison": 2,
+        "added": 1,
+        "removed": 1,
+        "persisted": 1,
+    }
+    assert summary["parameters"] == {
+        "baseline": 2,
+        "comparison": 2,
+        "added": 1,
+        "removed": 1,
+        "persisted": 1,
+    }
+
+    details = {
+        (record["entity"], record["status"], record["value"])
+        for record in records[1:]
+    }
+    assert ("url", "persisted", "https://example.com/persist?id=FUZZ") in details
+    assert ("url", "removed", "https://example.com/legacy?legacy=FUZZ") in details
+    assert ("url", "added", "https://example.com/new?q=FUZZ") in details
+    assert ("parameter", "persisted", "id") in details
+    assert ("parameter", "removed", "legacy") in details
+    assert ("parameter", "added", "q") in details
+
+
+def test_changes_support_month_periods_and_deterministic_text():
+    records = records_for(
+        _change_history(),
+        "changes",
+        compare_periods=("202001", "202101"),
+    )
+    summary = records[0]
+    assert summary["granularity"] == "month"
+    assert format_record(summary, "txt").startswith("summary\t202001\t202101\t")
+
+    detail = next(record for record in records if record.get("status") == "added")
+    assert format_record(detail, "txt").split("\t")[:4] == [
+        "202001",
+        "202101",
+        detail["entity"],
+        "added",
+    ]
+
+
 def test_jsonl_output_is_compact_and_machine_readable():
     record = records_for(_history(), "summary")[0]
     encoded = format_record(record, "jsonl")
