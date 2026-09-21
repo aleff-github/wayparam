@@ -175,13 +175,17 @@ With `--format jsonl`, the extension is `.jsonl`.
 
 ## Web UI
 
-The local web interface exposes the same four views from the **View** selector:
+The local web interface exposes the same historical views from the **View** selector:
 
 - Normalized URLs
 - Historical endpoints
 - Historical parameters
 - Domain summary
 - Temporal timeline
+- Temporal changes
+
+When **Temporal changes** is selected, enter a baseline and comparison period using
+the same `YYYY` or `YYYYMM` rules as `--changes`.
 
 Historical records are emitted after each domain has been aggregated, while the
 normal URL view continues to stream URLs as they are discovered.

@@ -115,7 +115,14 @@
           <option value="params">Historical parameters</option>
           <option value="summary">Domain summary</option>
           <option value="timeline">Temporal timeline</option>
+          <option value="changes">Temporal changes</option>
         </select></label>
+      <div class="row" id="changes_periods">
+        <label><span>Baseline period</span>
+          <input type="text" id="change_baseline" placeholder="2020 or 202401"></label>
+        <label><span>Comparison period</span>
+          <input type="text" id="change_comparison" placeholder="2024 or 202501"></label>
+      </div>
       <label id="timeline_granularity_label"><span>Timeline granularity</span>
         <select id="timeline_granularity">
           <option value="year">Year</option>
@@ -198,6 +205,8 @@
       cc_rps: Number(val("cc_rps")),
       analysis: val("analysis") === "source_summary" ? "" : val("analysis"),
       timeline_granularity: val("timeline_granularity") || "year",
+      change_baseline: val("change_baseline"),
+      change_comparison: val("change_comparison"),
       source_summary: val("analysis") === "source_summary",
       provenance: on("provenance")
     };
@@ -268,7 +277,7 @@
 
     const view = $("analysis");
     for (const option of view.options) {
-      if (["history", "params", "summary", "timeline"].includes(option.value)) {
+      if (["history", "params", "summary", "timeline", "changes"].includes(option.value)) {
         option.disabled = source !== "wayback";
       } else if (option.value === "source_summary") {
         option.disabled = !multiSource;
@@ -280,11 +289,15 @@
 
   function syncModeControls() {
     const mode = val("analysis");
-    const historical = ["history", "params", "summary", "timeline"].includes(mode);
+    const historical = ["history", "params", "summary", "timeline", "changes"].includes(mode);
     const sourceSummary = mode === "source_summary";
     const timeline = mode === "timeline";
+    const changes = mode === "changes";
     $("timeline_granularity").disabled = !timeline;
     $("timeline_granularity_label").style.opacity = timeline ? "1" : ".5";
+    $("change_baseline").disabled = !changes;
+    $("change_comparison").disabled = !changes;
+    $("changes_periods").style.opacity = changes ? "1" : ".5";
     $("provenance").disabled = historical || sourceSummary;
     if ($("provenance").disabled) $("provenance").checked = false;
 

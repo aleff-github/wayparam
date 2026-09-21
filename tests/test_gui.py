@@ -100,6 +100,16 @@ def test_analysis_mode_is_sanitized():
         config_from_request({"domains": "example.com", "analysis": "timeline"}).analysis
         == "timeline"
     )
+    changes = config_from_request(
+        {
+            "domains": "example.com",
+            "analysis": "changes",
+            "change_baseline": "2020",
+            "change_comparison": "2024",
+        }
+    )
+    assert changes.analysis == "changes"
+    assert changes.compare_periods == ("2020", "2024")
     assert config_from_request({"domains": "example.com", "analysis": "other"}).analysis is None
 
 
@@ -122,6 +132,30 @@ def test_timeline_granularity_reaches_gui_config():
         }
     )
     assert invalid.timeline_granularity == "year"
+
+
+@pytest.mark.parametrize(
+    ("baseline", "comparison"),
+    [
+        ("", "2024"),
+        ("2020", ""),
+        ("2020", "202401"),
+        ("202413", "202501"),
+        ("2024", "2020"),
+    ],
+)
+def test_invalid_gui_change_periods_are_rejected(baseline, comparison):
+    with pytest.raises(Rejected) as exc:
+        config_from_request(
+            {
+                "domains": "example.com",
+                "analysis": "changes",
+                "change_baseline": baseline,
+                "change_comparison": comparison,
+            }
+        )
+    assert exc.value.status == 400
+    assert "change" in exc.value.message.lower()
 
 
 def test_files_are_only_written_when_an_outdir_is_given(tmp_path: Path):
@@ -433,6 +467,68 @@ def test_timeline_is_streamed_with_requested_granularity(server, monkeypatch):
     assert [event["record"]["period"] for event in analyses] == ["202401", "202402"]
     assert analyses[0]["record"]["new_urls"] == 1
     assert analyses[1]["record"]["new_parameters"] == 1
+
+
+def test_temporal_changes_are_streamed_from_gui(server, monkeypatch):
+    port, token = server
+
+    async def fake_history(cfg, *, on_progress=None):
+        history = DomainHistory(domain=cfg.domains[0], fetched=3)
+        history.add(
+            "https://example.com/persist?id=FUZZ",
+            CaptureRecord(
+                original="https://example.com/persist?id=1",
+                timestamp="20200102030405",
+                status_code="200",
+                mime_type="text/html",
+            ),
+        )
+        history.add(
+            "https://example.com/persist?id=FUZZ",
+            CaptureRecord(
+                original="https://example.com/persist?id=2",
+                timestamp="20240102030405",
+                status_code="200",
+                mime_type="text/html",
+            ),
+        )
+        history.add(
+            "https://example.com/new?q=FUZZ",
+            CaptureRecord(
+                original="https://example.com/new?q=test",
+                timestamp="20240203040506",
+                status_code="200",
+                mime_type="text/html",
+            ),
+        )
+        return HistoryRunResult(
+            stats=[DomainStats(cfg.domains[0], fetched=3, kept=3)],
+            analyses={cfg.domains[0]: history},
+        )
+
+    monkeypatch.setattr("wayparam.gui.server.run_history", fake_history)
+    events = _stream(
+        port,
+        token,
+        {
+            "domains": "example.com",
+            "analysis": "changes",
+            "change_baseline": "2020",
+            "change_comparison": "2024",
+            "format": "jsonl",
+        },
+    )
+
+    analyses = [event for event in events if event["type"] == "analysis"]
+    assert events[0]["compare_periods"] == ["2020", "2024"]
+    assert analyses[0]["mode"] == "changes"
+    assert analyses[0]["record"]["type"] == "change_summary"
+    assert analyses[0]["record"]["urls"]["added"] == 1
+    assert any(
+        event["record"].get("status") == "persisted"
+        and event["record"].get("value") == "https://example.com/persist?id=FUZZ"
+        for event in analyses[1:]
+    )
 
 
 def test_gui_provenance_reaches_config():
