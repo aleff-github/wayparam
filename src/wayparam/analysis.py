@@ -14,7 +14,7 @@ from urllib.parse import parse_qsl, quote, urlsplit
 
 import httpx
 
-from .config import AnalysisMode, RunConfig
+from .config import AnalysisMode, RunConfig, TimelineGranularity
 from .core import Budget, DomainStats, ProgressCallback, client_kwargs
 from .filters import is_boring
 from .normalize import canonicalize_url
@@ -51,6 +51,7 @@ class EndpointHistory:
     last_seen: str | None = None
     status_codes: Counter[str] = field(default_factory=Counter)
     mime_types: Counter[str] = field(default_factory=Counter)
+    capture_months: set[str] = field(default_factory=set)
 
     def add(self, capture: CaptureRecord) -> None:
         self.captures += 1
@@ -60,6 +61,8 @@ class EndpointHistory:
             self.status_codes[capture.status_code] += 1
         if capture.mime_type:
             self.mime_types[capture.mime_type] += 1
+        if capture.timestamp and len(capture.timestamp) >= 6:
+            self.capture_months.add(capture.timestamp[:6])
 
 
 @dataclass
@@ -83,6 +86,7 @@ class DomainHistory:
     fetched: int = 0
     accepted: int = 0
     endpoints: dict[str, EndpointHistory] = field(default_factory=dict)
+    accepted_captures_by_month: Counter[str] = field(default_factory=Counter)
 
     def add(self, canonical_url: str, capture: CaptureRecord) -> None:
         self.accepted += 1
@@ -91,6 +95,8 @@ class DomainHistory:
             endpoint = EndpointHistory(url=canonical_url)
             self.endpoints[canonical_url] = endpoint
         endpoint.add(capture)
+        if capture.timestamp and len(capture.timestamp) >= 6:
+            self.accepted_captures_by_month[capture.timestamp[:6]] += 1
 
     def parameters(self) -> dict[str, ParameterHistory]:
         params: dict[str, ParameterHistory] = {}
@@ -129,6 +135,54 @@ class DomainHistory:
         for endpoint in self.endpoints.values():
             total.update(endpoint.mime_types)
         return total
+
+    def timeline(self, granularity: TimelineGranularity = "year") -> list[dict]:
+        """Aggregate accepted archive evidence into deterministic time buckets."""
+
+        def period(month: str) -> str:
+            return month[:4] if granularity == "year" else month
+
+        captures: Counter[str] = Counter()
+        for month, count in self.accepted_captures_by_month.items():
+            captures[period(month)] += count
+
+        urls: Counter[str] = Counter()
+        new_urls: Counter[str] = Counter()
+        params_by_period: dict[str, set[str]] = {}
+
+        for endpoint in self.endpoints.values():
+            endpoint_periods = {period(month) for month in endpoint.capture_months}
+            names = {
+                key for key, _ in parse_qsl(urlsplit(endpoint.url).query, keep_blank_values=True)
+            }
+            for bucket in endpoint_periods:
+                urls[bucket] += 1
+                params_by_period.setdefault(bucket, set()).update(names)
+
+            if endpoint.first_seen and len(endpoint.first_seen) >= 6:
+                new_urls[period(endpoint.first_seen[:6])] += 1
+
+        new_params: Counter[str] = Counter()
+        for item in self.parameters().values():
+            if item.first_seen and len(item.first_seen) >= 6:
+                new_params[period(item.first_seen[:6])] += 1
+
+        periods = sorted(
+            set(captures) | set(urls) | set(new_urls) | set(params_by_period) | set(new_params)
+        )
+        return [
+            {
+                "type": "timeline",
+                "domain": self.domain,
+                "period": bucket,
+                "captures": captures[bucket],
+                "unique_urls": urls[bucket],
+                "new_urls": new_urls[bucket],
+                "unique_parameters": len(params_by_period.get(bucket, set())),
+                "new_parameters": new_params[bucket],
+            }
+            for bucket in periods
+        ]
 
 
 @dataclass
@@ -257,7 +311,12 @@ def _counter_dict(counter: Counter[str]) -> dict[str, int]:
     return {key: counter[key] for key in sorted(counter)}
 
 
-def records_for(history: DomainHistory, mode: AnalysisMode) -> list[dict]:
+def records_for(
+    history: DomainHistory,
+    mode: AnalysisMode,
+    *,
+    timeline_granularity: TimelineGranularity = "year",
+) -> list[dict]:
     """Return deterministic serializable records for one analysis view."""
     if mode == "history":
         return [
@@ -287,6 +346,9 @@ def records_for(history: DomainHistory, mode: AnalysisMode) -> list[dict]:
             }
             for item in sorted(history.parameters().values(), key=lambda item: item.parameter)
         ]
+
+    if mode == "timeline":
+        return history.timeline(timeline_granularity)
 
     params = history.parameters()
     return [
@@ -335,6 +397,17 @@ def format_record(record: dict, fmt: OutputFormat) -> str:
                 record["last_seen"] or "-",
             ]
         )
+    if kind == "timeline":
+        return "\t".join(
+            [
+                record["period"],
+                str(record["captures"]),
+                str(record["unique_urls"]),
+                str(record["new_urls"]),
+                str(record["unique_parameters"]),
+                str(record["new_parameters"]),
+            ]
+        )
     return "\t".join(
         [
             record["domain"],
@@ -365,5 +438,5 @@ def write_analysis_files(result: HistoryRunResult, cfg: RunConfig, mode: Analysi
         if history is None:
             continue
         with open_outfile(analysis_path(cfg.outdir, domain, mode, cfg.out_format)) as fh:
-            for record in records_for(history, mode):
+            for record in records_for(history, mode, timeline_granularity=cfg.timeline_granularity):
                 fh.write(format_record(record, cfg.out_format) + "\n")

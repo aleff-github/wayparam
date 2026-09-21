@@ -164,12 +164,22 @@ def test_exit_code_is_0_when_a_budget_stopped_the_run(monkeypatch):
         ("--history", "history"),
         ("--params", "params"),
         ("--summary", "summary"),
+        ("--timeline", "timeline"),
     ],
 )
 def test_analysis_flags_reach_the_config(flag, mode):
     parser = cli.build_arg_parser()
     cfg = cli.build_config(parser.parse_args(["-d", "example.com", flag]))
     assert cfg.analysis == mode
+
+
+def test_timeline_granularity_reaches_the_config():
+    parser = cli.build_arg_parser()
+    cfg = cli.build_config(
+        parser.parse_args(["-d", "example.com", "--timeline", "--timeline-granularity", "month"])
+    )
+    assert cfg.analysis == "timeline"
+    assert cfg.timeline_granularity == "month"
 
 
 def test_analysis_views_are_mutually_exclusive():

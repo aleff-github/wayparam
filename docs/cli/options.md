@@ -174,6 +174,7 @@ The following flags are mutually exclusive:
 - `--history`: one record per normalized URL, with first/last seen, capture count, status-code counts and MIME-type counts
 - `--params`: one record per query-parameter name, with endpoint count, capture count and first/last seen
 - `--summary`: one aggregate record per domain
+- `--timeline`: one record per year/month bucket with accepted captures, observed/new normalized URLs and observed/new parameter names
 
 Historical modes currently require `--source wayback`. They request `timestamp,statuscode,mimetype,original` from Wayback CDX and automatically disable `collapse=urlkey`, because collapsed results cannot provide correct capture counts or first/last-seen dates.
 
@@ -181,7 +182,16 @@ Historical modes currently require `--source wayback`. They request `timestamp,s
 wayparam -d example.com --history --stdout --no-files --format jsonl
 wayparam -d example.com --params
 wayparam -d example.com --summary --format jsonl
+wayparam -d example.com --timeline --timeline-granularity month --format jsonl
 ```
+
+### `--timeline-granularity {year|month}`
+Choose the bucket size used by `--timeline`.
+
+**Default:** `year`
+
+This option does not change archive retrieval; it only changes how accepted
+capture timestamps are aggregated.
 
 Text output is tab-separated. JSONL output uses structured records. File output uses mode-specific names such as `example.com.history.jsonl` so normal URL results are never overwritten.
 

@@ -95,6 +95,41 @@ def test_summary_is_one_record_per_domain():
     assert record["status_codes"] == {"200": 2, "302": 1}
 
 
+def test_timeline_year_view_reports_activity_and_first_seen_counts():
+    records = {record["period"]: record for record in records_for(_history(), "timeline")}
+
+    assert records["2020"] == {
+        "type": "timeline",
+        "domain": "example.com",
+        "period": "2020",
+        "captures": 1,
+        "unique_urls": 1,
+        "new_urls": 1,
+        "unique_parameters": 2,
+        "new_parameters": 2,
+    }
+    assert records["2021"]["captures"] == 1
+    assert records["2021"]["unique_urls"] == 1
+    assert records["2021"]["new_urls"] == 0
+    assert records["2021"]["new_parameters"] == 0
+    assert records["2022"]["unique_urls"] == 1
+    assert records["2022"]["new_urls"] == 1
+    assert records["2022"]["new_parameters"] == 1
+
+
+def test_timeline_month_granularity_is_deterministic():
+    records = records_for(_history(), "timeline", timeline_granularity="month")
+
+    assert [record["period"] for record in records] == ["202001", "202101", "202201"]
+    assert all(record["captures"] == 1 for record in records)
+
+
+def test_text_timeline_output_is_tab_separated():
+    record = records_for(_history(), "timeline")[0]
+    encoded = format_record(record, "txt")
+    assert encoded.split("\t") == ["2020", "1", "1", "1", "2", "2"]
+
+
 def test_jsonl_output_is_compact_and_machine_readable():
     record = records_for(_history(), "summary")[0]
     encoded = format_record(record, "jsonl")

@@ -164,9 +164,23 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Emit one historical summary record per domain.",
     )
     analysis.add_argument(
+        "--timeline",
+        dest="analysis",
+        action="store_const",
+        const="timeline",
+        help="Aggregate accepted historical evidence into year/month time buckets.",
+    )
+    analysis.add_argument(
         "--source-summary",
         action="store_true",
         help="Summarize union, overlap and source-exclusive normalized URLs across archives.",
+    )
+
+    p.add_argument(
+        "--timeline-granularity",
+        choices=["year", "month"],
+        default="year",
+        help="Time bucket for --timeline: year or month (default: year).",
     )
 
     # Shared archive query options
@@ -388,6 +402,7 @@ def build_config(args: argparse.Namespace) -> RunConfig:
         write_files=not args.no_files,
         out_format=args.format,
         analysis=args.analysis,
+        timeline_granularity=args.timeline_granularity,
         provenance=args.provenance,
         source_summary=args.source_summary,
         max_results=max(0, args.max_results),
@@ -457,7 +472,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.provenance and args.format != "jsonl":
         parser.error("--provenance requires --format jsonl")
     if args.provenance and args.analysis:
-        parser.error("--provenance cannot be combined with --history/--params/--summary")
+        parser.error("--provenance cannot be combined with historical analysis modes")
     if args.provenance and args.source_summary:
         parser.error("--provenance cannot be combined with --source-summary")
 
@@ -476,7 +491,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("no domains to process")
 
     if cfg.analysis and cfg.sources != ("wayback",):
-        parser.error("--history/--params/--summary currently require --source wayback")
+        parser.error("--history/--params/--summary/--timeline currently require --source wayback")
     if cfg.source_summary and len(cfg.sources) < 2:
         parser.error("--source-summary requires at least two archive sources")
 
@@ -522,7 +537,11 @@ def main(argv: list[str] | None = None) -> int:
                     history = history_result.analyses.get(domain)
                     if history is None:
                         continue
-                    for record in records_for(history, cfg.analysis):
+                    for record in records_for(
+                        history,
+                        cfg.analysis,
+                        timeline_granularity=cfg.timeline_granularity,
+                    ):
                         print(format_record(record, cfg.out_format), flush=True)
             return _report(history_result, cfg, args.stats)
 

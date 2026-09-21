@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- Added `--timeline` historical analysis with deterministic year/month buckets for accepted captures, observed/new normalized URLs, and observed/new parameter names
+
 ## 0.7.0
 - Added opt-in multi-source provenance mode with `--provenance`, preserving one normalized JSONL record per archive source while keeping default global deduplication unchanged
 - Added `--source-summary` for provider-neutral union, shared, all-source overlap and source-exclusive normalized URL counts; bounded summaries apply `--max-results` independently to each selected provider so later sources are not starved

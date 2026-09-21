@@ -31,6 +31,7 @@ http://www.example.com/?format=FUZZ&retailerId=FUZZ
 - **Retry + backoff** and clearer error messages
 - **Lossless CDX pagination** with automatic block-mode fallback
 - **Historical intelligence**: first/last seen, capture counts, status/MIME distributions, parameter prevalence
+- **Temporal surface intelligence**: year/month timelines of archived endpoint and parameter activity
 - Filters “boring” URLs by:
   - extension blacklist/whitelist
   - optional path regex exclusion
@@ -216,7 +217,16 @@ wayparam -d example.com --params
 wayparam -d example.com --summary --format jsonl
 ```
 
-Historical modes retrieve capture metadata and automatically disable CDX collapse so that first/last seen and capture counts are meaningful. They can therefore transfer substantially more data than a normal URL run; use `--from`, `--to`, filters or `--max-results` to bound the analysis.
+### 13) Temporal surface timeline
+
+```bash
+wayparam -d example.com --timeline --timeline-granularity year
+wayparam -d example.com --timeline --timeline-granularity month --format jsonl --stdout --no-files
+```
+
+Each bucket reports accepted captures, normalized URLs observed in that period, URLs first observed in that period, parameter names observed, and parameter names first observed. The default granularity is `year`.
+
+Historical modes retrieve capture metadata and automatically disable CDX collapse so that first/last seen, capture counts and timeline activity are meaningful. They can therefore transfer substantially more data than a normal URL run; use `--from`, `--to`, filters or `--max-results` to bound the analysis.
 
 ---
 
@@ -307,6 +317,8 @@ See [Archive sources](docs/sources.md) for provider behavior and caveats.
 * `--history` — aggregate first/last seen, capture counts, status codes and MIME types per normalized URL
 * `--params` — aggregate endpoint/capture prevalence per query-parameter name
 * `--summary` — one historical summary record per domain
+* `--timeline` — aggregate archived endpoint/parameter activity into time buckets
+* `--timeline-granularity year|month` — choose timeline bucket size (default: year)
 
 These views are mutually exclusive. In historical modes, `--max-results` caps accepted capture rows before aggregation.
 
