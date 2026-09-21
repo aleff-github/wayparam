@@ -8,8 +8,8 @@ import asyncio
 import json
 import logging
 from collections import Counter
-from itertools import combinations
 from dataclasses import dataclass, field, replace
+from itertools import combinations
 from pathlib import Path
 from urllib.parse import parse_qsl, quote, urlsplit
 
