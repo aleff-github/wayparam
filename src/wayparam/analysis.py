@@ -15,6 +15,7 @@ from urllib.parse import parse_qsl, quote, urlsplit
 
 import httpx
 
+from . import __version__
 from .config import AnalysisMode, RunConfig, TimelineGranularity
 from .core import Budget, DomainStats, ProgressCallback, client_kwargs
 from .filters import is_boring
@@ -26,6 +27,7 @@ from .wayback import CaptureRecord, iter_captures
 log = logging.getLogger("wayparam")
 
 _PROGRESS_EVERY = 1000
+REPORT_SCHEMA = "wayparam-evidence-report/v1"
 
 
 def _min_ts(current: str | None, candidate: str | None) -> str | None:
@@ -528,8 +530,19 @@ def records_for(
     *,
     timeline_granularity: TimelineGranularity = "year",
     compare_periods: tuple[str, str] | None = None,
+    report_complete: bool | None = None,
+    report_bounded: bool = False,
 ) -> list[dict]:
     """Return deterministic serializable records for one analysis view."""
+    if mode == "report":
+        return report_records(
+            history,
+            timeline_granularity=timeline_granularity,
+            compare_periods=compare_periods,
+            complete=report_complete,
+            bounded=report_bounded,
+        )
+
     if mode == "history":
         return [
             {
@@ -590,6 +603,62 @@ def records_for(
     ]
 
 
+def report_records(
+    history: DomainHistory,
+    *,
+    timeline_granularity: TimelineGranularity = "year",
+    compare_periods: tuple[str, str] | None = None,
+    complete: bool | None = None,
+    bounded: bool = False,
+) -> list[dict]:
+    """Build a versioned JSONL evidence bundle from one historical aggregation."""
+    sections: list[AnalysisMode] = [
+        "summary",
+        "history",
+        "params",
+        "timeline",
+        "topology",
+        "cooccurrence",
+    ]
+    if compare_periods is not None:
+        sections.append("changes")
+
+    manifest = {
+        "type": "report_manifest",
+        "schema": REPORT_SCHEMA,
+        "generator": {"name": "wayparam", "version": __version__},
+        "domain": history.domain,
+        "source": "wayback",
+        "evidence_scope": "archive-index",
+        "sections": list(sections),
+        "timeline_granularity": timeline_granularity,
+        "compare_periods": list(compare_periods) if compare_periods else None,
+        "complete": complete,
+        "bounded_capture_budget": bounded,
+        "limitations": [
+            "Archive-index evidence only; no live-target state is inferred.",
+            "Bounded or incomplete runs may omit archived evidence.",
+        ],
+    }
+
+    out = [manifest]
+    for section in sections:
+        for record in records_for(
+            history,
+            section,
+            timeline_granularity=timeline_granularity,
+            compare_periods=compare_periods,
+        ):
+            out.append(
+                {
+                    "type": "report_record",
+                    "section": section,
+                    "record": record,
+                }
+            )
+    return out
+
+
 def _compact_counter(value: dict[str, int]) -> str:
     return ",".join(f"{key}:{count}" for key, count in value.items()) or "-"
 
@@ -599,6 +668,8 @@ def format_record(record: dict, fmt: OutputFormat) -> str:
         return json.dumps(record, ensure_ascii=False, separators=(",", ":"))
 
     kind = record["type"]
+    if kind in {"report_manifest", "report_record"}:
+        raise ValueError("evidence reports require jsonl output")
     if kind == "history":
         return "\t".join(
             [
@@ -719,15 +790,19 @@ def write_analysis_files(result: HistoryRunResult, cfg: RunConfig, mode: Analysi
     if not cfg.write_files:
         return
     cfg.outdir.mkdir(parents=True, exist_ok=True)
+    stats_by_domain = {item.domain: item for item in result.stats}
     for domain in cfg.domains:
         history = result.analyses.get(domain)
         if history is None:
             continue
+        stats = stats_by_domain.get(domain)
         with open_outfile(analysis_path(cfg.outdir, domain, mode, cfg.out_format)) as fh:
             for record in records_for(
                 history,
                 mode,
                 timeline_granularity=cfg.timeline_granularity,
                 compare_periods=cfg.compare_periods,
+                report_complete=stats.complete if stats else None,
+                report_bounded=cfg.max_results > 0,
             ):
                 fh.write(format_record(record, cfg.out_format) + "\n")

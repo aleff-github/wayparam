@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+- Added JSONL-only `--report` evidence bundles with the versioned `wayparam-evidence-report/v1` schema, combining summary, endpoint history, parameter history, timeline, topology and co-occurrence from one Wayback metadata pass
+- Added optional `--report-changes BASELINE COMPARISON` to include temporal change evidence in the same report bundle
+
 ## 0.9.0
 - Added `--topology` historical surface topology analysis, grouping archive evidence by host/path with observed schemes, normalized URL variants, parameter unions and deterministic parameter-set variants
 - Added `--cooccurrence` to report unordered parameter pairs observed together, with normalized URL, route, capture and first/last-seen evidence

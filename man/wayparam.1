@@ -157,6 +157,20 @@ Report unordered query-parameter pairs observed together on normalized archived
 endpoint variants. Records include URL count, distinct host/path route count,
 capture count and first/last seen. No risk or exploitability score is inferred.
 .TP
+.BR \-\-report
+Emit a versioned JSONL evidence bundle from one uncollapsed Wayback metadata
+pass. The bundle begins with a report manifest using schema
+.BR wayparam-evidence-report/v1
+and then wraps summary, history, parameter, timeline, topology and
+co-occurrence records. Requires
+.BR "--format jsonl" .
+.TP
+.BR \-\-report\-changes " " \fIBASELINE COMPARISON\fR
+Include period-change evidence inside
+.BR \-\-report .
+Both values must use the same YYYY or YYYYMM granularity and BASELINE must
+precede COMPARISON.
+.TP
 .BR \-\-source\-summary
 Compare normalized URL coverage across at least two selected archive sources.
 The summary reports the union, per-source counts, source-exclusive counts, URLs
@@ -372,6 +386,14 @@ Group archived endpoints by host/path structure:
 wayparam -d example.com --topology --format jsonl
 .fi
 .RE
+.PP
+Build a versioned evidence report:
+.PP
+.RS
+.nf
+wayparam -d example.com --report --format jsonl --stdout --no-files
+.fi
+.RE
 .SH FILES
 .TP
 .I results/<domain>.txt
@@ -401,6 +423,9 @@ Historical host/path topology with parameter-set variants.
 .TP
 .I results/<domain>.cooccurrence.{txt,jsonl}
 Historical parameter-pair co-occurrence evidence.
+.TP
+.I results/<domain>.report.jsonl
+Versioned historical evidence report bundle.
 .SH EXIT STATUS
 .TP
 .B 0

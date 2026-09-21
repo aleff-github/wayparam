@@ -3,7 +3,7 @@
 wayparam can aggregate capture-level metadata from the Wayback CDX API instead
 of returning only normalized URLs.
 
-The six analysis views are mutually exclusive:
+The individual analysis views are mutually exclusive:
 
 ```bash
 wayparam -d example.com --history
@@ -13,6 +13,7 @@ wayparam -d example.com --timeline
 wayparam -d example.com --changes 2020 2024
 wayparam -d example.com --topology
 wayparam -d example.com --cooccurrence
+wayparam -d example.com --report --format jsonl
 ```
 
 They work with the normal filtering, date-range, subdomain, proxy, rate-limit
@@ -210,6 +211,46 @@ Pairs are descriptive archive-index evidence only. Their presence or frequency
 does not imply dependency between parameters, exploitability or current live
 behavior.
 
+
+## `--report`
+
+The evidence report is the versioned, machine-readable bundle intended for
+long-lived pipelines and research artifacts. It is JSONL-only and reuses one
+historical Wayback metadata pass to emit all compatible views together.
+
+Example:
+
+```bash
+wayparam -d example.com --report --format jsonl --stdout --no-files
+```
+
+The first line is a `report_manifest` with schema
+`wayparam-evidence-report/v1`, the Wayparam generator version, archive source,
+domain, evidence scope, included sections, timeline granularity, completeness
+state and whether a capture budget was configured.
+
+Following lines are `report_record` wrappers. Each wrapper identifies its
+`section` and contains the unchanged record produced by that individual view.
+The default sections are:
+
+- `summary`
+- `history`
+- `params`
+- `timeline`
+- `topology`
+- `cooccurrence`
+
+Optional period-change evidence can be included without a second archive query:
+
+```bash
+wayparam -d example.com --report --report-changes 2020 2024 \
+  --format jsonl --stdout --no-files
+```
+
+Reports are explicitly scoped to archive-index evidence. A bounded or incomplete
+run can omit evidence and the manifest records that limitation.
+
+
 ## Output files
 
 When files are enabled, analysis views do not overwrite the normal URL output.
@@ -223,6 +264,7 @@ results/example.com.timeline.txt
 results/example.com.changes.txt
 results/example.com.topology.txt
 results/example.com.cooccurrence.txt
+results/example.com.report.jsonl
 ```
 
 With `--format jsonl`, the extension is `.jsonl`.

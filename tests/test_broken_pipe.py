@@ -167,12 +167,33 @@ def test_exit_code_is_0_when_a_budget_stopped_the_run(monkeypatch):
         ("--timeline", "timeline"),
         ("--topology", "topology"),
         ("--cooccurrence", "cooccurrence"),
+        ("--report", "report"),
     ],
 )
 def test_analysis_flags_reach_the_config(flag, mode):
     parser = cli.build_arg_parser()
     cfg = cli.build_config(parser.parse_args(["-d", "example.com", flag]))
     assert cfg.analysis == mode
+
+
+def test_report_changes_reach_the_config():
+    parser = cli.build_arg_parser()
+    cfg = cli.build_config(
+        parser.parse_args(
+            [
+                "-d",
+                "example.com",
+                "--report",
+                "--report-changes",
+                "2020",
+                "2024",
+                "--format",
+                "jsonl",
+            ]
+        )
+    )
+    assert cfg.analysis == "report"
+    assert cfg.compare_periods == ("2020", "2024")
 
 
 def test_timeline_granularity_reaches_the_config():
@@ -204,6 +225,30 @@ def test_invalid_change_periods_are_usage_errors(periods, capsys):
         cli.main(["-d", "example.com", "--changes", *periods])
     assert exc.value.code == 2
     assert "change" in capsys.readouterr().err.lower()
+
+
+def test_report_requires_jsonl(capsys):
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["-d", "example.com", "--report"])
+    assert exc.value.code == 2
+    assert "--report requires --format jsonl" in capsys.readouterr().err
+
+
+def test_report_changes_require_report(capsys):
+    with pytest.raises(SystemExit) as exc:
+        cli.main(
+            [
+                "-d",
+                "example.com",
+                "--report-changes",
+                "2020",
+                "2024",
+                "--format",
+                "jsonl",
+            ]
+        )
+    assert exc.value.code == 2
+    assert "--report-changes requires --report" in capsys.readouterr().err
 
 
 def test_analysis_views_are_mutually_exclusive():

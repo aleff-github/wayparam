@@ -33,6 +33,7 @@ http://www.example.com/?format=FUZZ&retailerId=FUZZ
 - **Historical intelligence**: first/last seen, capture counts, status/MIME distributions, parameter prevalence
 - **Temporal surface intelligence**: year/month timelines of archived endpoint and parameter activity
 - **Surface topology intelligence**: host/path grouping with observed parameter-set variants and parameter co-occurrence
+- **Versioned evidence reports**: combine historical views in one JSONL bundle from a single archive metadata pass
 - Filters “boring” URLs by:
   - extension blacklist/whitelist
   - optional path regex exclusion
@@ -252,6 +253,19 @@ wayparam -d example.com --cooccurrence --format jsonl --stdout --no-files
 
 `--cooccurrence` emits one record for each unordered pair of parameter names observed together on the same normalized endpoint variant, including represented URL count, distinct host/path routes, capture count and first/last seen. It is descriptive archive evidence only and does not assign risk or exploitability.
 
+### 17) Build a versioned evidence report
+
+```bash
+wayparam -d example.com --report --format jsonl --stdout --no-files
+wayparam -d example.com --report --report-changes 2020 2024 --format jsonl
+```
+
+`--report` performs one uncollapsed Wayback metadata pass and emits a
+`wayparam-evidence-report/v1` JSONL bundle containing summary, endpoint history,
+parameter history, timeline, topology and co-occurrence records. Optional
+`--report-changes` adds a two-period comparison to the same bundle. The manifest
+records generator version, included sections and completeness/bounded-run context.
+
 Historical modes retrieve capture metadata and automatically disable CDX collapse so that first/last seen, capture counts and temporal activity are meaningful. They can therefore transfer substantially more data than a normal URL run; use `--from`, `--to`, filters or `--max-results` to bound the analysis.
 
 ---
@@ -348,6 +362,8 @@ See [Archive sources](docs/sources.md) for provider behavior and caveats.
 * `--changes BASELINE COMPARISON` — compare two YYYY or YYYYMM archive buckets
 * `--topology` — group archived normalized URL evidence by host/path and parameter-set variants
 * `--cooccurrence` — aggregate unordered parameter pairs observed on the same archived endpoint variants
+* `--report --format jsonl` — emit the versioned evidence bundle from one historical pass
+* `--report-changes BASELINE COMPARISON` — optionally include temporal change evidence in a report
 
 These views are mutually exclusive. In historical modes, `--max-results` caps accepted capture rows before aggregation.
 
