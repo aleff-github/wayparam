@@ -8,9 +8,8 @@ import json
 import httpx
 import pytest
 
-import wayparam.providers.commoncrawl as commoncrawl_module
-
 from wayparam.http import HttpConfig
+import wayparam.providers.commoncrawl as commoncrawl_module
 from wayparam.providers.commoncrawl import (
     CommonCrawlOptions,
     CommonCrawlProvider,
@@ -278,7 +277,7 @@ def test_early_provider_close_closes_nested_commoncrawl_stream(monkeypatch):
         )
         async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
             records = provider.iter_urls("example.com", client=client)
-            first = await anext(records)
+            first = await records.__anext__()
             assert first.original == "https://example.com/?id=1"
             await records.aclose()
             assert state["closed"] is True
