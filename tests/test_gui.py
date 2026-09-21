@@ -110,6 +110,14 @@ def test_analysis_mode_is_sanitized():
     )
     assert changes.analysis == "changes"
     assert changes.compare_periods == ("2020", "2024")
+    assert (
+        config_from_request({"domains": "example.com", "analysis": "topology"}).analysis
+        == "topology"
+    )
+    assert (
+        config_from_request({"domains": "example.com", "analysis": "cooccurrence"}).analysis
+        == "cooccurrence"
+    )
     assert config_from_request({"domains": "example.com", "analysis": "other"}).analysis is None
 
 
@@ -529,6 +537,67 @@ def test_temporal_changes_are_streamed_from_gui(server, monkeypatch):
         and event["record"].get("value") == "https://example.com/persist?id=FUZZ"
         for event in analyses[1:]
     )
+
+
+@pytest.mark.parametrize(
+    ("mode", "expected_type"),
+    [
+        ("topology", "topology"),
+        ("cooccurrence", "cooccurrence"),
+    ],
+)
+def test_surface_intelligence_views_are_streamed_from_gui(server, monkeypatch, mode, expected_type):
+    port, token = server
+
+    async def fake_history(cfg, *, on_progress=None):
+        history = DomainHistory(domain=cfg.domains[0], fetched=2)
+        history.add(
+            "https://example.com/item?id=FUZZ&lang=FUZZ",
+            CaptureRecord(
+                original="https://example.com/item?id=1&lang=en",
+                timestamp="20200102030405",
+                status_code="200",
+                mime_type="text/html",
+            ),
+        )
+        history.add(
+            "https://example.com/item?id=FUZZ&q=FUZZ",
+            CaptureRecord(
+                original="https://example.com/item?id=2&q=test",
+                timestamp="20240102030405",
+                status_code="200",
+                mime_type="text/html",
+            ),
+        )
+        return HistoryRunResult(
+            stats=[DomainStats(cfg.domains[0], fetched=2, kept=2)],
+            analyses={cfg.domains[0]: history},
+        )
+
+    monkeypatch.setattr("wayparam.gui.server.run_history", fake_history)
+    events = _stream(
+        port,
+        token,
+        {
+            "domains": "example.com",
+            "analysis": mode,
+            "format": "jsonl",
+        },
+    )
+
+    analyses = [event for event in events if event["type"] == "analysis"]
+    assert events[0]["analysis"] == mode
+    assert analyses
+    assert all(event["mode"] == mode for event in analyses)
+    assert analyses[0]["record"]["type"] == expected_type
+
+    if mode == "topology":
+        assert analyses[0]["record"]["host"] == "example.com"
+        assert analyses[0]["record"]["path"] == "/item"
+        assert analyses[0]["record"]["parameters"] == ["id", "lang", "q"]
+    else:
+        pairs = {tuple(event["record"]["parameters"]) for event in analyses}
+        assert pairs == {("id", "lang"), ("id", "q")}
 
 
 def test_gui_provenance_reaches_config():
