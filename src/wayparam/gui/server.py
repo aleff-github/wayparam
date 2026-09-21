@@ -28,7 +28,13 @@ from urllib.parse import parse_qs, urlsplit
 
 from .. import __version__
 from ..analysis import format_record, records_for, run_history, write_analysis_files
-from ..config import AnalysisMode, RunConfig, TimelineGranularity, build_filter_options
+from ..config import (
+    AnalysisMode,
+    RunConfig,
+    TimelineGranularity,
+    build_filter_options,
+    validate_compare_periods,
+)
 from ..core import run
 from ..http import HttpConfig
 from ..io import parse_domains
@@ -77,10 +83,21 @@ def config_from_request(data: dict) -> RunConfig:
     raw_analysis = str(data.get("analysis", "") or "").strip()
     analysis = cast(
         Optional[AnalysisMode],
-        raw_analysis if raw_analysis in ("history", "params", "summary", "timeline") else None,
+        raw_analysis
+        if raw_analysis in ("history", "params", "summary", "timeline", "changes")
+        else None,
     )
     if analysis and sources != ("wayback",):
         raise Rejected(400, "Historical analysis currently supports Wayback only.")
+
+    compare_periods: tuple[str, str] | None = None
+    if analysis == "changes":
+        baseline = str(data.get("change_baseline", "") or "").strip()
+        comparison = str(data.get("change_comparison", "") or "").strip()
+        try:
+            compare_periods = validate_compare_periods((baseline, comparison))
+        except ValueError as exc:
+            raise Rejected(400, str(exc)) from None
 
     raw_timeline_granularity = str(data.get("timeline_granularity", "year") or "year").strip()
     timeline_granularity = cast(
@@ -124,6 +141,7 @@ def config_from_request(data: dict) -> RunConfig:
         out_format="jsonl" if data.get("format") == "jsonl" else "txt",
         analysis=analysis,
         timeline_granularity=timeline_granularity,
+        compare_periods=compare_periods,
         provenance=provenance,
         source_summary=source_summary,
         concurrency=_int("concurrency", 6, 1, 64),
@@ -298,6 +316,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     "sources": list(cfg.sources),
                     "analysis": cfg.analysis,
                     "timeline_granularity": cfg.timeline_granularity,
+                    "compare_periods": list(cfg.compare_periods) if cfg.compare_periods else None,
                     "provenance": cfg.provenance,
                     "source_summary": cfg.source_summary,
                 }
@@ -329,6 +348,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                         history,
                         cfg.analysis,
                         timeline_granularity=cfg.timeline_granularity,
+                        compare_periods=cfg.compare_periods,
                     ):
                         chunk(
                             {
