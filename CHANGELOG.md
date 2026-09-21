@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- Added opt-in multi-source provenance mode with `--provenance`, preserving one normalized JSONL record per archive source while keeping default global deduplication unchanged
+
 ## 0.6.1
 - Fixed Historical Intelligence aborting on malformed archived URLs such as invalid bracketed hosts; unusable captures are now skipped instead of failing the whole domain
 - Fixed Common Crawl async-generator shutdown errors when a bounded run or consumer stops early by explicitly closing nested streams on Python 3.9+
