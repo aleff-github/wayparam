@@ -176,7 +176,6 @@ def test_analysis_flags_reach_the_config(flag, mode):
     assert cfg.analysis == mode
 
 
-
 def test_report_changes_reach_the_config():
     parser = cli.build_arg_parser()
     cfg = cli.build_config(
@@ -227,13 +226,11 @@ def test_invalid_change_periods_are_usage_errors(periods, capsys):
     assert "change" in capsys.readouterr().err.lower()
 
 
-
 def test_report_requires_jsonl(capsys):
     with pytest.raises(SystemExit) as exc:
         cli.main(["-d", "example.com", "--report"])
     assert exc.value.code == 2
     assert "--report requires --format jsonl" in capsys.readouterr().err
-
 
 def test_report_changes_require_report(capsys):
     with pytest.raises(SystemExit) as exc:
