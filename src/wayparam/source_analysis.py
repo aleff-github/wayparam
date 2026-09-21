@@ -85,7 +85,7 @@ class _Accumulator:
             source: sum(mask == self._bits[source] for mask in masks.values())
             for source in self.sources
         }
-        shared_urls = sum(mask.bit_count() >= 2 for mask in masks.values())
+        shared_urls = sum(bin(mask).count("1") >= 2 for mask in masks.values())
         overlap_urls = sum(mask == all_mask for mask in masks.values())
 
         return SourceSummary(
