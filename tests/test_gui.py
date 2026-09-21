@@ -177,6 +177,7 @@ def test_invalid_optional_gui_report_periods_are_rejected(baseline, comparison):
     assert exc.value.status == 400
     assert "change" in exc.value.message.lower()
 
+
 def test_timeline_granularity_reaches_gui_config():
     monthly = config_from_request(
         {
