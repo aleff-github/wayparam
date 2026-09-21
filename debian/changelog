@@ -1,3 +1,16 @@
+wayparam (0.9.0-1) noble; urgency=medium
+
+  * New upstream release.
+  * Add Surface Topology Intelligence grouped by archived host/path structure.
+  * Report deterministic parameter-set variants with URL/capture counts and
+    first/last-seen evidence.
+  * Add parameter co-occurrence analysis with route, URL and capture counts.
+  * Expose topology and co-occurrence views in the local web UI.
+  * Keep structural and co-occurrence conclusions explicitly scoped to
+    archive-index evidence without vulnerability or exploitability scoring.
+
+ -- Aleff <alessandro.greco.1@protonmail.com>  Mon, 21 Sep 2026 16:48:00 +0200
+
 wayparam (0.8.0-1) noble; urgency=medium
 
   * New upstream release.
