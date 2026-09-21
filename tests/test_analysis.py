@@ -130,6 +130,91 @@ def test_text_timeline_output_is_tab_separated():
     assert encoded.split("\t") == ["2020", "1", "1", "1", "2", "2"]
 
 
+def _topology_history() -> DomainHistory:
+    history = DomainHistory(domain="example.com")
+    observations = [
+        (
+            "https://example.com/item?id=FUZZ&lang=FUZZ",
+            "20200101000000",
+        ),
+        (
+            "https://example.com/item?id=FUZZ&lang=FUZZ",
+            "20210101000000",
+        ),
+        (
+            "http://example.com/item?id=FUZZ",
+            "20220101000000",
+        ),
+        (
+            "https://api.example.com/item?q=FUZZ",
+            "20230101000000",
+        ),
+    ]
+    for url, timestamp in observations:
+        history.add(
+            url,
+            CaptureRecord(
+                original=url,
+                timestamp=timestamp,
+                status_code="200",
+                mime_type="text/html",
+            ),
+        )
+    history.fetched = len(observations)
+    return history
+
+
+def test_topology_groups_by_host_and_path_with_parameter_set_variants():
+    records = records_for(_topology_history(), "topology")
+
+    assert [(record["host"], record["path"]) for record in records] == [
+        ("api.example.com", "/item"),
+        ("example.com", "/item"),
+    ]
+
+    item = records[1]
+    assert item["schemes"] == ["http", "https"]
+    assert item["captures"] == 3
+    assert item["unique_urls"] == 2
+    assert item["unique_parameters"] == 2
+    assert item["parameters"] == ["id", "lang"]
+    assert item["first_seen"] == "20200101000000"
+    assert item["last_seen"] == "20220101000000"
+    assert item["parameter_sets"] == [
+        {
+            "parameters": ["id"],
+            "unique_urls": 1,
+            "captures": 1,
+            "first_seen": "20220101000000",
+            "last_seen": "20220101000000",
+        },
+        {
+            "parameters": ["id", "lang"],
+            "unique_urls": 1,
+            "captures": 2,
+            "first_seen": "20200101000000",
+            "last_seen": "20210101000000",
+        },
+    ]
+
+
+def test_topology_text_output_is_deterministic():
+    record = records_for(_topology_history(), "topology")[1]
+    fields = format_record(record, "txt").split("\t")
+
+    assert fields[:8] == [
+        "example.com",
+        "/item",
+        "http,https",
+        "3",
+        "2",
+        "2",
+        "id,lang",
+        "2",
+    ]
+    assert fields[8] == "id:1:1;id,lang:1:2"
+
+
 def _change_history() -> DomainHistory:
     history = DomainHistory(domain="example.com")
     captures = [

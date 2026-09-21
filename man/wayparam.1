@@ -145,6 +145,13 @@ COMPARISON. Output classifies normalized URLs and parameter names as added,
 removed or persisted. These classifications describe archive evidence, not
 current live-target state.
 .TP
+.BR \-\-topology
+Group accepted historical evidence by host and path. Records include observed
+schemes, capture counts, normalized URL variants, first/last seen, the union of
+query-parameter names and deterministic parameter-set variants. The result
+describes archive evidence only and does not imply that a route or parameter
+combination is currently deployed.
+.TP
 .BR \-\-source\-summary
 Compare normalized URL coverage across at least two selected archive sources.
 The summary reports the union, per-source counts, source-exclusive counts, URLs
@@ -352,6 +359,14 @@ Compare archive evidence between two years:
 wayparam -d example.com --changes 2020 2024 --format jsonl
 .fi
 .RE
+.PP
+Group archived endpoints by host/path structure:
+.PP
+.RS
+.nf
+wayparam -d example.com --topology --format jsonl
+.fi
+.RE
 .SH FILES
 .TP
 .I results/<domain>.txt
@@ -375,6 +390,9 @@ Historical temporal timeline.
 .TP
 .I results/<domain>.changes.{txt,jsonl}
 Historical comparison between two archive periods.
+.TP
+.I results/<domain>.topology.{txt,jsonl}
+Historical host/path topology with parameter-set variants.
 .SH EXIT STATUS
 .TP
 .B 0

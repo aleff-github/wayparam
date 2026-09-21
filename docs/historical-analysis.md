@@ -3,7 +3,7 @@
 wayparam can aggregate capture-level metadata from the Wayback CDX API instead
 of returning only normalized URLs.
 
-The five analysis views are mutually exclusive:
+The six analysis views are mutually exclusive:
 
 ```bash
 wayparam -d example.com --history
@@ -11,6 +11,7 @@ wayparam -d example.com --params
 wayparam -d example.com --summary
 wayparam -d example.com --timeline
 wayparam -d example.com --changes 2020 2024
+wayparam -d example.com --topology
 ```
 
 They work with the normal filtering, date-range, subdomain, proxy, rate-limit
@@ -158,6 +159,33 @@ the live site. Sparse archive coverage can also affect all three categories.
 `--from`, `--to` and `--max-results` are applied before the comparison,
 so restrictive or bounded runs should be interpreted as partial evidence.
 
+## `--topology`
+
+This view groups accepted normalized endpoint evidence by **host + path**, ignoring
+the URL scheme for grouping while preserving the schemes actually observed.
+
+Each record contains:
+
+- host and path
+- observed schemes
+- total accepted captures represented by the route
+- unique normalized URL variants
+- first/last seen timestamps
+- union of observed query-parameter names
+- deterministic parameter-set variants, each with normalized-URL count,
+  represented capture count and first/last seen
+
+Example:
+
+```bash
+wayparam -d example.com --topology --format jsonl --stdout --no-files
+```
+
+When `--include-subdomains` is enabled, hosts remain separate, so identical paths
+on different subdomains are not merged. Parameter-set variants describe archive
+observations only and do not imply which parameters are required by a current
+live endpoint.
+
 ## Output files
 
 When files are enabled, analysis views do not overwrite the normal URL output.
@@ -169,6 +197,7 @@ results/example.com.params.txt
 results/example.com.summary.txt
 results/example.com.timeline.txt
 results/example.com.changes.txt
+results/example.com.topology.txt
 ```
 
 With `--format jsonl`, the extension is `.jsonl`.

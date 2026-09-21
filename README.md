@@ -32,6 +32,7 @@ http://www.example.com/?format=FUZZ&retailerId=FUZZ
 - **Lossless CDX pagination** with automatic block-mode fallback
 - **Historical intelligence**: first/last seen, capture counts, status/MIME distributions, parameter prevalence
 - **Temporal surface intelligence**: year/month timelines of archived endpoint and parameter activity
+- **Surface topology intelligence**: host/path grouping with observed parameter-set variants
 - Filters “boring” URLs by:
   - extension blacklist/whitelist
   - optional path regex exclusion
@@ -235,6 +236,14 @@ wayparam -d example.com --changes 202401 202501
 
 `--changes` compares two periods at the same granularity and reports a summary plus deterministic URL/parameter records classified as `added`, `removed` or `persisted`. Here, `removed` means “observed in the baseline archive bucket but not in the comparison bucket”; it does **not** prove that the endpoint or parameter disappeared from the live site.
 
+### 15) Inspect archived surface topology
+
+```bash
+wayparam -d example.com --topology --format jsonl --stdout --no-files
+```
+
+`--topology` groups normalized archive evidence by host and path, then reports observed schemes, capture counts, first/last seen, the union of parameter names and deterministic parameter-set variants. This is structural archive evidence only; it does not claim that a route or parameter combination is currently deployed.
+
 Historical modes retrieve capture metadata and automatically disable CDX collapse so that first/last seen, capture counts and temporal activity are meaningful. They can therefore transfer substantially more data than a normal URL run; use `--from`, `--to`, filters or `--max-results` to bound the analysis.
 
 ---
@@ -329,6 +338,7 @@ See [Archive sources](docs/sources.md) for provider behavior and caveats.
 * `--timeline` — aggregate archived endpoint/parameter activity into time buckets
 * `--timeline-granularity year|month` — choose timeline bucket size (default: year)
 * `--changes BASELINE COMPARISON` — compare two YYYY or YYYYMM archive buckets
+* `--topology` — group archived normalized URL evidence by host/path and parameter-set variants
 
 These views are mutually exclusive. In historical modes, `--max-results` caps accepted capture rows before aggregation.
 

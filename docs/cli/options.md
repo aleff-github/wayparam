@@ -176,6 +176,7 @@ The following flags are mutually exclusive:
 - `--summary`: one aggregate record per domain
 - `--timeline`: one record per year/month bucket with accepted captures, observed/new normalized URLs and observed/new parameter names
 - `--changes BASELINE COMPARISON`: compare two YYYY or YYYYMM buckets and classify normalized URLs/parameters as added, removed or persisted
+- `--topology`: group normalized archive evidence by host/path and parameter-set variants
 
 Historical modes currently require `--source wayback`. They request `timestamp,statuscode,mimetype,original` from Wayback CDX and automatically disable `collapse=urlkey`, because collapsed results cannot provide correct capture counts or first/last-seen dates.
 
@@ -185,7 +186,16 @@ wayparam -d example.com --params
 wayparam -d example.com --summary --format jsonl
 wayparam -d example.com --timeline --timeline-granularity month --format jsonl
 wayparam -d example.com --changes 2020 2024 --format jsonl
+wayparam -d example.com --topology --format jsonl
 ```
+
+### `--topology`
+Group accepted historical evidence by host/path. The record includes observed
+schemes, total captures, normalized URL variants, first/last seen, the union of
+parameter names and deterministic parameter-set variants.
+
+The view describes archive-index evidence only and does not infer which
+parameters are required or which routes are currently deployed.
 
 ### `--changes BASELINE COMPARISON`
 Compare two historical archive buckets. Both periods must be `YYYY` or both

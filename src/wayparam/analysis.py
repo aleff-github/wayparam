@@ -81,6 +81,51 @@ class ParameterHistory:
 
 
 @dataclass
+class ParameterSetHistory:
+    parameters: tuple[str, ...]
+    urls: int = 0
+    captures: int = 0
+    first_seen: str | None = None
+    last_seen: str | None = None
+
+    def add_endpoint(self, endpoint: EndpointHistory) -> None:
+        self.urls += 1
+        self.captures += endpoint.captures
+        self.first_seen = _min_ts(self.first_seen, endpoint.first_seen)
+        self.last_seen = _max_ts(self.last_seen, endpoint.last_seen)
+
+
+@dataclass
+class PathTopology:
+    host: str
+    path: str
+    schemes: set[str] = field(default_factory=set)
+    urls: int = 0
+    captures: int = 0
+    first_seen: str | None = None
+    last_seen: str | None = None
+    parameters: set[str] = field(default_factory=set)
+    parameter_sets: dict[tuple[str, ...], ParameterSetHistory] = field(default_factory=dict)
+
+    def add_endpoint(self, endpoint: EndpointHistory) -> None:
+        parts = urlsplit(endpoint.url)
+        if parts.scheme:
+            self.schemes.add(parts.scheme)
+        self.urls += 1
+        self.captures += endpoint.captures
+        self.first_seen = _min_ts(self.first_seen, endpoint.first_seen)
+        self.last_seen = _max_ts(self.last_seen, endpoint.last_seen)
+
+        names = tuple(sorted({key for key, _ in parse_qsl(parts.query, keep_blank_values=True)}))
+        self.parameters.update(names)
+        variant = self.parameter_sets.get(names)
+        if variant is None:
+            variant = ParameterSetHistory(parameters=names)
+            self.parameter_sets[names] = variant
+        variant.add_endpoint(endpoint)
+
+
+@dataclass
 class DomainHistory:
     domain: str
     fetched: int = 0
@@ -111,6 +156,52 @@ class DomainHistory:
                     params[name] = item
                 item.add_endpoint(endpoint)
         return params
+
+    def topology(self) -> list[dict]:
+        """Group archived endpoint variants by host/path structure."""
+        groups: dict[tuple[str, str], PathTopology] = {}
+
+        for endpoint in self.endpoints.values():
+            parts = urlsplit(endpoint.url)
+            host = parts.netloc
+            path = parts.path or "/"
+            key = (host, path)
+            item = groups.get(key)
+            if item is None:
+                item = PathTopology(host=host, path=path)
+                groups[key] = item
+            item.add_endpoint(endpoint)
+
+        records: list[dict] = []
+        for key in sorted(groups):
+            item = groups[key]
+            variants = [
+                {
+                    "parameters": list(variant.parameters),
+                    "unique_urls": variant.urls,
+                    "captures": variant.captures,
+                    "first_seen": variant.first_seen,
+                    "last_seen": variant.last_seen,
+                }
+                for _, variant in sorted(item.parameter_sets.items())
+            ]
+            records.append(
+                {
+                    "type": "topology",
+                    "domain": self.domain,
+                    "host": item.host,
+                    "path": item.path,
+                    "schemes": sorted(item.schemes),
+                    "captures": item.captures,
+                    "unique_urls": item.urls,
+                    "unique_parameters": len(item.parameters),
+                    "parameters": sorted(item.parameters),
+                    "parameter_sets": variants,
+                    "first_seen": item.first_seen,
+                    "last_seen": item.last_seen,
+                }
+            )
+        return records
 
     def first_seen(self) -> str | None:
         value: str | None = None
@@ -421,6 +512,9 @@ def records_for(
     if mode == "timeline":
         return history.timeline(timeline_granularity)
 
+    if mode == "topology":
+        return history.topology()
+
     if mode == "changes":
         if compare_periods is None:
             raise ValueError("changes analysis requires two comparison periods")
@@ -482,6 +576,29 @@ def format_record(record: dict, fmt: OutputFormat) -> str:
                 str(record["new_urls"]),
                 str(record["unique_parameters"]),
                 str(record["new_parameters"]),
+            ]
+        )
+    if kind == "topology":
+        parameter_sets = (
+            ";".join(
+                f"{','.join(item['parameters']) or '-'}:{item['unique_urls']}:{item['captures']}"
+                for item in record["parameter_sets"]
+            )
+            or "-"
+        )
+        return "\t".join(
+            [
+                record["host"],
+                record["path"],
+                ",".join(record["schemes"]) or "-",
+                str(record["captures"]),
+                str(record["unique_urls"]),
+                str(record["unique_parameters"]),
+                ",".join(record["parameters"]) or "-",
+                str(len(record["parameter_sets"])),
+                parameter_sets,
+                record["first_seen"] or "-",
+                record["last_seen"] or "-",
             ]
         )
     if kind == "change_summary":
