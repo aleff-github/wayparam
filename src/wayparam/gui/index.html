@@ -199,7 +199,7 @@
   function handle(ev) {
     if (ev.type === "url") {
       if (on("provenance") && ev.source) addResult(JSON.stringify({
-        domain: ev.domain, url: ev.url, source: ev.source
+        domain: ev.domain, url: ev.url, source: ev.source, fetched_at: ev.fetched_at || null
       }));
       else addResult(ev.url);
     }
