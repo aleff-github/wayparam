@@ -361,7 +361,6 @@ def test_historical_summary_is_streamed_as_analysis_event(server, monkeypatch):
     assert events[1]["record"]["unique_urls"] == 1
 
 
-
 def test_gui_provenance_reaches_config():
     cfg = config_from_request(
         {
