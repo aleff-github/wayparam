@@ -13,6 +13,7 @@ import asyncio
 import json
 import re
 from collections.abc import AsyncGenerator
+from contextlib import aclosing
 from dataclasses import dataclass, replace
 
 import httpx
@@ -146,14 +147,17 @@ class CommonCrawlProvider:
     ) -> AsyncGenerator[str, None]:
         async with self._request_guard():
             await self._before_request()
-            async for line in iter_lines(
-                client,
-                url,
-                params=params,
-                config=self._http,
-                empty_statuses={404},
-            ):
-                yield line
+            async with aclosing(
+                iter_lines(
+                    client,
+                    url,
+                    params=params,
+                    config=self._http,
+                    empty_statuses={404},
+                )
+            ) as lines:
+                async for line in lines:
+                    yield line
 
     async def _resolve_indexes(self, client: httpx.AsyncClient) -> list[tuple[str, str]]:
         if self._resolved is not None:
@@ -248,15 +252,17 @@ class CommonCrawlProvider:
                 ("pageSize", str(self._options.page_size)),
                 ("page", str(page)),
             ]
-            async for line in self._stream(client, endpoint, params=params):
-                record = parse_index_record(line)
-                if record is None:
-                    raise ValueError(f"Malformed Common Crawl index row: {line[:160]}")
-                yield record
+            async with aclosing(self._stream(client, endpoint, params=params)) as lines:
+                async for line in lines:
+                    record = parse_index_record(line)
+                    if record is None:
+                        raise ValueError(f"Malformed Common Crawl index row: {line[:160]}")
+                    yield record
 
     async def iter_urls(
         self, domain: str, *, client: httpx.AsyncClient
     ) -> AsyncGenerator[SourceRecord, None]:
         for _index_id, endpoint in await self._resolve_indexes(client):
-            async for record in self._iter_index(client, endpoint, domain):
-                yield record
+            async with aclosing(self._iter_index(client, endpoint, domain)) as records:
+                async for record in records:
+                    yield record
