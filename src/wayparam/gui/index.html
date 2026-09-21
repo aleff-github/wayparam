@@ -114,6 +114,12 @@
           <option value="history">Historical endpoints</option>
           <option value="params">Historical parameters</option>
           <option value="summary">Domain summary</option>
+          <option value="timeline">Temporal timeline</option>
+        </select></label>
+      <label id="timeline_granularity_label"><span>Timeline granularity</span>
+        <select id="timeline_granularity">
+          <option value="year">Year</option>
+          <option value="month">Month</option>
         </select></label>
       <div class="check"><input type="checkbox" id="provenance"><span>Preserve one result per archive source</span></div>
       <label><span>Also write files to (blank = stream only)</span>
@@ -191,6 +197,7 @@
       cc_page_size: Number(val("cc_page_size")) || 5,
       cc_rps: Number(val("cc_rps")),
       analysis: val("analysis") === "source_summary" ? "" : val("analysis"),
+      timeline_granularity: val("timeline_granularity") || "year",
       source_summary: val("analysis") === "source_summary",
       provenance: on("provenance")
     };
@@ -261,7 +268,7 @@
 
     const view = $("analysis");
     for (const option of view.options) {
-      if (["history", "params", "summary"].includes(option.value)) {
+      if (["history", "params", "summary", "timeline"].includes(option.value)) {
         option.disabled = source !== "wayback";
       } else if (option.value === "source_summary") {
         option.disabled = !multiSource;
@@ -273,8 +280,11 @@
 
   function syncModeControls() {
     const mode = val("analysis");
-    const historical = ["history", "params", "summary"].includes(mode);
+    const historical = ["history", "params", "summary", "timeline"].includes(mode);
     const sourceSummary = mode === "source_summary";
+    const timeline = mode === "timeline";
+    $("timeline_granularity").disabled = !timeline;
+    $("timeline_granularity_label").style.opacity = timeline ? "1" : ".5";
     $("provenance").disabled = historical || sourceSummary;
     if ($("provenance").disabled) $("provenance").checked = false;
 
