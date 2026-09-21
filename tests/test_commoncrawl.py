@@ -8,6 +8,8 @@ import json
 import httpx
 import pytest
 
+import wayparam.providers.commoncrawl as commoncrawl_module
+
 from wayparam.http import HttpConfig
 from wayparam.providers.commoncrawl import (
     CommonCrawlOptions,
@@ -229,3 +231,56 @@ def test_invalid_explicit_index_is_rejected():
 
     with pytest.raises(ValueError, match="invalid Common Crawl index"):
         asyncio.run(go())
+
+
+def test_early_provider_close_closes_nested_commoncrawl_stream(monkeypatch):
+    state = {"closed": False}
+
+    class ClosableLines:
+        def __init__(self):
+            self._done = False
+
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            if self._done:
+                raise StopAsyncIteration
+            self._done = True
+            return json.dumps(
+                {
+                    "url": "https://example.com/?id=1",
+                    "timestamp": "20260915123456",
+                    "status": "200",
+                    "mime": "text/html",
+                }
+            )
+
+        async def aclose(self):
+            state["closed"] = True
+
+    def fake_iter_lines(*args, **kwargs):
+        return ClosableLines()
+
+    monkeypatch.setattr(commoncrawl_module, "iter_lines", fake_iter_lines)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        query = dict(request.url.params)
+        if "showNumPages" in query:
+            return httpx.Response(200, json={"blocks": 1, "pages": 1, "pageSize": 5})
+        raise AssertionError("data rows should come from the patched streaming iterator")
+
+    async def go():
+        provider = CommonCrawlProvider(
+            options=CommonCrawlOptions(indexes=("CC-MAIN-2026-39",), rps=0),
+            query=CdxOptions(),
+            http=CFG,
+        )
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            records = provider.iter_urls("example.com", client=client)
+            first = await anext(records)
+            assert first.original == "https://example.com/?id=1"
+            await records.aclose()
+            assert state["closed"] is True
+
+    asyncio.run(go())
