@@ -56,6 +56,13 @@ and
 .BR wayback ).
 Normalized URLs are deduplicated across providers.
 .TP
+.BR \-\-provenance
+Preserve one normalized record per archive source instead of globally
+deduplicating the same endpoint across selected providers. This mode requires
+.BR "--format jsonl"
+because text output cannot represent source provenance. Repeated variants within
+the same source are still deduplicated.
+.TP
 .BR \-\-cc\-index " " \fIID\fR
 Common Crawl crawl index ID. Repeat or use comma-separated IDs to query several
 collections. The default is
