@@ -152,6 +152,11 @@ query-parameter names and deterministic parameter-set variants. The result
 describes archive evidence only and does not imply that a route or parameter
 combination is currently deployed.
 .TP
+.BR \-\-cooccurrence
+Report unordered query-parameter pairs observed together on normalized archived
+endpoint variants. Records include URL count, distinct host/path route count,
+capture count and first/last seen. No risk or exploitability score is inferred.
+.TP
 .BR \-\-source\-summary
 Compare normalized URL coverage across at least two selected archive sources.
 The summary reports the union, per-source counts, source-exclusive counts, URLs
@@ -393,6 +398,9 @@ Historical comparison between two archive periods.
 .TP
 .I results/<domain>.topology.{txt,jsonl}
 Historical host/path topology with parameter-set variants.
+.TP
+.I results/<domain>.cooccurrence.{txt,jsonl}
+Historical parameter-pair co-occurrence evidence.
 .SH EXIT STATUS
 .TP
 .B 0

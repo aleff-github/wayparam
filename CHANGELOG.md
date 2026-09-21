@@ -2,6 +2,7 @@
 
 ## Unreleased
 - Added `--topology` historical surface topology analysis, grouping archive evidence by host/path with observed schemes, normalized URL variants, parameter unions and deterministic parameter-set variants
+- Added `--cooccurrence` to report unordered parameter pairs observed together, with normalized URL, route, capture and first/last-seen evidence
 
 ## 0.8.0
 - Added `--timeline` historical analysis with deterministic year/month buckets for accepted captures, observed/new normalized URLs, and observed/new parameter names

@@ -9,6 +9,7 @@ import json
 import logging
 from collections import Counter
 from dataclasses import dataclass, field, replace
+from itertools import combinations
 from pathlib import Path
 from urllib.parse import parse_qsl, quote, urlsplit
 
@@ -126,6 +127,25 @@ class PathTopology:
 
 
 @dataclass
+class ParameterPairHistory:
+    left: str
+    right: str
+    urls: int = 0
+    captures: int = 0
+    routes: set[tuple[str, str]] = field(default_factory=set)
+    first_seen: str | None = None
+    last_seen: str | None = None
+
+    def add_endpoint(self, endpoint: EndpointHistory) -> None:
+        parts = urlsplit(endpoint.url)
+        self.urls += 1
+        self.captures += endpoint.captures
+        self.routes.add((parts.netloc, parts.path or "/"))
+        self.first_seen = _min_ts(self.first_seen, endpoint.first_seen)
+        self.last_seen = _max_ts(self.last_seen, endpoint.last_seen)
+
+
+@dataclass
 class DomainHistory:
     domain: str
     fetched: int = 0
@@ -156,6 +176,36 @@ class DomainHistory:
                     params[name] = item
                 item.add_endpoint(endpoint)
         return params
+
+    def cooccurrence(self) -> list[dict]:
+        """Aggregate unordered parameter pairs observed on the same archived endpoint."""
+        pairs: dict[tuple[str, str], ParameterPairHistory] = {}
+
+        for endpoint in self.endpoints.values():
+            names = sorted(
+                {key for key, _ in parse_qsl(urlsplit(endpoint.url).query, keep_blank_values=True)}
+            )
+            for left, right in combinations(names, 2):
+                key = (left, right)
+                item = pairs.get(key)
+                if item is None:
+                    item = ParameterPairHistory(left=left, right=right)
+                    pairs[key] = item
+                item.add_endpoint(endpoint)
+
+        return [
+            {
+                "type": "cooccurrence",
+                "domain": self.domain,
+                "parameters": [item.left, item.right],
+                "unique_urls": item.urls,
+                "routes": len(item.routes),
+                "captures": item.captures,
+                "first_seen": item.first_seen,
+                "last_seen": item.last_seen,
+            }
+            for _, item in sorted(pairs.items())
+        ]
 
     def topology(self) -> list[dict]:
         """Group archived endpoint variants by host/path structure."""
@@ -515,6 +565,9 @@ def records_for(
     if mode == "topology":
         return history.topology()
 
+    if mode == "cooccurrence":
+        return history.cooccurrence()
+
     if mode == "changes":
         if compare_periods is None:
             raise ValueError("changes analysis requires two comparison periods")
@@ -597,6 +650,18 @@ def format_record(record: dict, fmt: OutputFormat) -> str:
                 ",".join(record["parameters"]) or "-",
                 str(len(record["parameter_sets"])),
                 parameter_sets,
+                record["first_seen"] or "-",
+                record["last_seen"] or "-",
+            ]
+        )
+    if kind == "cooccurrence":
+        return "\t".join(
+            [
+                record["parameters"][0],
+                record["parameters"][1],
+                str(record["unique_urls"]),
+                str(record["routes"]),
+                str(record["captures"]),
                 record["first_seen"] or "-",
                 record["last_seen"] or "-",
             ]

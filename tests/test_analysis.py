@@ -215,6 +215,52 @@ def test_topology_text_output_is_deterministic():
     assert fields[8] == "id:1:1;id,lang:1:2"
 
 
+def test_cooccurrence_counts_pairs_routes_urls_and_captures():
+    history = _topology_history()
+    history.add(
+        "https://example.com/search?id=FUZZ&lang=FUZZ&q=FUZZ",
+        CaptureRecord(
+            original="https://example.com/search?id=1&lang=en&q=test",
+            timestamp="20240101000000",
+            status_code="200",
+            mime_type="text/html",
+        ),
+    )
+
+    records = {
+        tuple(record["parameters"]): record for record in records_for(history, "cooccurrence")
+    }
+
+    assert records[("id", "lang")] == {
+        "type": "cooccurrence",
+        "domain": "example.com",
+        "parameters": ["id", "lang"],
+        "unique_urls": 2,
+        "routes": 2,
+        "captures": 3,
+        "first_seen": "20200101000000",
+        "last_seen": "20240101000000",
+    }
+    assert records[("id", "q")]["unique_urls"] == 1
+    assert records[("lang", "q")]["captures"] == 1
+
+
+def test_cooccurrence_ignores_single_parameter_endpoints_and_formats_text():
+    records = records_for(_history(), "cooccurrence")
+    assert [record["parameters"] for record in records] == [["id", "lang"]]
+
+    fields = format_record(records[0], "txt").split("\t")
+    assert fields == [
+        "id",
+        "lang",
+        "1",
+        "1",
+        "2",
+        "20200101000000",
+        "20210101000000",
+    ]
+
+
 def _change_history() -> DomainHistory:
     history = DomainHistory(domain="example.com")
     captures = [
