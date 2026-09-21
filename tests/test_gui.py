@@ -118,8 +118,65 @@ def test_analysis_mode_is_sanitized():
         config_from_request({"domains": "example.com", "analysis": "cooccurrence"}).analysis
         == "cooccurrence"
     )
+    report = config_from_request(
+        {"domains": "example.com", "analysis": "report", "format": "jsonl"}
+    )
+    assert report.analysis == "report"
+    assert report.out_format == "jsonl"
+    assert report.compare_periods is None
     assert config_from_request({"domains": "example.com", "analysis": "other"}).analysis is None
 
+
+
+def test_gui_report_can_include_optional_change_periods():
+    cfg = config_from_request(
+        {
+            "domains": "example.com",
+            "analysis": "report",
+            "format": "jsonl",
+            "change_baseline": "2020",
+            "change_comparison": "2024",
+        }
+    )
+    assert cfg.analysis == "report"
+    assert cfg.compare_periods == ("2020", "2024")
+
+
+def test_gui_report_requires_jsonl():
+    with pytest.raises(Rejected) as exc:
+        config_from_request(
+            {
+                "domains": "example.com",
+                "analysis": "report",
+                "format": "txt",
+            }
+        )
+    assert exc.value.status == 400
+    assert "JSONL" in exc.value.message
+
+
+@pytest.mark.parametrize(
+    ("baseline", "comparison"),
+    [
+        ("2020", ""),
+        ("", "2024"),
+        ("2020", "202401"),
+        ("2024", "2020"),
+    ],
+)
+def test_invalid_optional_gui_report_periods_are_rejected(baseline, comparison):
+    with pytest.raises(Rejected) as exc:
+        config_from_request(
+            {
+                "domains": "example.com",
+                "analysis": "report",
+                "format": "jsonl",
+                "change_baseline": baseline,
+                "change_comparison": comparison,
+            }
+        )
+    assert exc.value.status == 400
+    assert "change" in exc.value.message.lower()
 
 def test_timeline_granularity_reaches_gui_config():
     monthly = config_from_request(
@@ -598,6 +655,66 @@ def test_surface_intelligence_views_are_streamed_from_gui(server, monkeypatch, m
     else:
         pairs = {tuple(event["record"]["parameters"]) for event in analyses}
         assert pairs == {("id", "lang"), ("id", "q")}
+
+
+def test_evidence_report_is_streamed_from_gui(server, monkeypatch):
+    port, token = server
+
+    async def fake_history(cfg, *, on_progress=None):
+        history = DomainHistory(domain=cfg.domains[0], fetched=2)
+        history.add(
+            "https://example.com/item?id=FUZZ&lang=FUZZ",
+            CaptureRecord(
+                original="https://example.com/item?id=1&lang=en",
+                timestamp="20200102030405",
+                status_code="200",
+                mime_type="text/html",
+            ),
+        )
+        history.add(
+            "https://example.com/item?id=FUZZ&q=FUZZ",
+            CaptureRecord(
+                original="https://example.com/item?id=2&q=test",
+                timestamp="20240102030405",
+                status_code="200",
+                mime_type="text/html",
+            ),
+        )
+        return HistoryRunResult(
+            stats=[DomainStats(cfg.domains[0], fetched=2, kept=2, complete=True)],
+            analyses={cfg.domains[0]: history},
+        )
+
+    monkeypatch.setattr("wayparam.gui.server.run_history", fake_history)
+    events = _stream(
+        port,
+        token,
+        {
+            "domains": "example.com",
+            "analysis": "report",
+            "format": "jsonl",
+            "timeline_granularity": "month",
+            "change_baseline": "2020",
+            "change_comparison": "2024",
+        },
+    )
+
+    analyses = [event for event in events if event["type"] == "analysis"]
+    assert events[0]["analysis"] == "report"
+    assert events[0]["compare_periods"] == ["2020", "2024"]
+    assert analyses[0]["mode"] == "report"
+    manifest = analyses[0]["record"]
+    assert manifest["type"] == "report_manifest"
+    assert manifest["schema"] == "wayparam-evidence-report/v1"
+    assert manifest["complete"] is True
+    assert manifest["bounded_capture_budget"] is False
+    assert manifest["timeline_granularity"] == "month"
+    assert manifest["sections"][-1] == "changes"
+    assert any(
+        event["record"].get("type") == "report_record"
+        and event["record"].get("section") == "topology"
+        for event in analyses[1:]
+    )
 
 
 def test_gui_provenance_reaches_config():
