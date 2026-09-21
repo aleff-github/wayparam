@@ -175,6 +175,7 @@ The following flags are mutually exclusive:
 - `--params`: one record per query-parameter name, with endpoint count, capture count and first/last seen
 - `--summary`: one aggregate record per domain
 - `--timeline`: one record per year/month bucket with accepted captures, observed/new normalized URLs and observed/new parameter names
+- `--changes BASELINE COMPARISON`: compare two YYYY or YYYYMM buckets and classify normalized URLs/parameters as added, removed or persisted
 
 Historical modes currently require `--source wayback`. They request `timestamp,statuscode,mimetype,original` from Wayback CDX and automatically disable `collapse=urlkey`, because collapsed results cannot provide correct capture counts or first/last-seen dates.
 
@@ -183,7 +184,16 @@ wayparam -d example.com --history --stdout --no-files --format jsonl
 wayparam -d example.com --params
 wayparam -d example.com --summary --format jsonl
 wayparam -d example.com --timeline --timeline-granularity month --format jsonl
+wayparam -d example.com --changes 2020 2024 --format jsonl
 ```
+
+### `--changes BASELINE COMPARISON`
+Compare two historical archive buckets. Both periods must be `YYYY` or both
+must be `YYYYMM`; the baseline must precede the comparison period.
+
+The output begins with a change summary and then emits deterministic detail
+records for URL shapes and parameter names. `removed` means absent from the
+comparison archive bucket, not proven absent from the live target.
 
 ### `--timeline-granularity {year|month}`
 Choose the bucket size used by `--timeline`.
