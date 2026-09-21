@@ -19,7 +19,7 @@ from .analysis import (
     run_history,
     write_analysis_files,
 )
-from .config import RunConfig, build_filter_options, validate_compare_periods
+from .config import AnalysisMode, RunConfig, build_filter_options, validate_compare_periods
 from .core import RunResult, run
 from .http import HttpConfig
 from .io import normalize_domain, read_domains
@@ -404,7 +404,11 @@ def build_config(args: argparse.Namespace) -> RunConfig:
     compare_periods = (
         validate_compare_periods((args.changes[0], args.changes[1])) if args.changes else None
     )
-    analysis_mode = "changes" if compare_periods else args.analysis
+    analysis_mode: AnalysisMode | None
+    if compare_periods:
+        analysis_mode = "changes"
+    else:
+        analysis_mode = args.analysis
 
     return RunConfig(
         domains=domains,
