@@ -546,9 +546,7 @@ def test_temporal_changes_are_streamed_from_gui(server, monkeypatch):
         ("cooccurrence", "cooccurrence"),
     ],
 )
-def test_surface_intelligence_views_are_streamed_from_gui(
-    server, monkeypatch, mode, expected_type
-):
+def test_surface_intelligence_views_are_streamed_from_gui(server, monkeypatch, mode, expected_type):
     port, token = server
 
     async def fake_history(cfg, *, on_progress=None):
