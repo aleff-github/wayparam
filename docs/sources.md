@@ -165,3 +165,33 @@ Useful upstream references:
 - https://index.commoncrawl.org/
 - https://index.commoncrawl.org/collinfo.json
 - https://commoncrawl.org/faq
+
+
+## Multi-source intelligence
+
+Wayparam 0.7 adds two opt-in views on top of normal multi-source collection.
+
+### Full provenance
+
+`--provenance --format jsonl` preserves one normalized record per selected
+archive source. The same normalized endpoint can therefore appear once for
+Wayback and once for Common Crawl, while repeated variants inside each source
+remain deduplicated. Without `--provenance`, the first configured provider
+still wins exactly as before.
+
+### Source overlap summary
+
+`--source-summary` aggregates provider membership per normalized endpoint and
+reports, for each domain:
+
+- the union of normalized URLs across configured sources;
+- per-source observed URL counts;
+- per-source exclusive counts;
+- URLs shared by at least two sources;
+- URLs observed by every configured source.
+
+These numbers describe evidence present in archive indexes. They do not imply
+that an endpoint is currently live, reachable, vulnerable, or still deployed.
+
+The local web interface exposes the same two modes and uses the same core
+aggregation logic as the CLI.

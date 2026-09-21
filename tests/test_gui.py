@@ -18,6 +18,7 @@ from wayparam.analysis import DomainHistory, HistoryRunResult
 from wayparam.core import DomainStats, RunResult
 from wayparam.gui.server import Rejected, config_from_request, is_client_gone, serve
 from wayparam.output import UrlRecord
+from wayparam.source_analysis import SourceSummary, SourceSummaryRunResult
 from wayparam.wayback import CaptureRecord
 
 # ---- request translation -------------------------------------------------
@@ -358,3 +359,147 @@ def test_historical_summary_is_streamed_as_analysis_event(server, monkeypatch):
     assert events[1]["mode"] == "summary"
     assert events[1]["record"]["type"] == "summary"
     assert events[1]["record"]["unique_urls"] == 1
+
+
+def test_gui_provenance_reaches_config():
+    cfg = config_from_request(
+        {
+            "domains": "example.com",
+            "source": "wayback,commoncrawl",
+            "format": "jsonl",
+            "provenance": True,
+        }
+    )
+    assert cfg.provenance is True
+    assert cfg.source_summary is False
+
+
+def test_gui_provenance_requires_jsonl():
+    with pytest.raises(Rejected) as exc:
+        config_from_request(
+            {
+                "domains": "example.com",
+                "source": "wayback,commoncrawl",
+                "format": "txt",
+                "provenance": True,
+            }
+        )
+    assert exc.value.status == 400
+    assert "JSONL" in exc.value.message
+
+
+def test_gui_source_summary_requires_multiple_sources():
+    with pytest.raises(Rejected) as exc:
+        config_from_request(
+            {
+                "domains": "example.com",
+                "source": "wayback",
+                "source_summary": True,
+            }
+        )
+    assert exc.value.status == 400
+    assert "at least two" in exc.value.message
+
+
+def test_gui_source_summary_reaches_config():
+    cfg = config_from_request(
+        {
+            "domains": "example.com",
+            "source": "wayback,commoncrawl",
+            "source_summary": True,
+        }
+    )
+    assert cfg.source_summary is True
+    assert cfg.provenance is False
+
+
+def test_gui_rejects_provenance_with_source_summary():
+    with pytest.raises(Rejected) as exc:
+        config_from_request(
+            {
+                "domains": "example.com",
+                "source": "wayback,commoncrawl",
+                "format": "jsonl",
+                "provenance": True,
+                "source_summary": True,
+            }
+        )
+    assert exc.value.status == 400
+    assert "mutually exclusive" in exc.value.message
+
+
+def test_source_summary_is_streamed_as_dedicated_event(server, monkeypatch):
+    port, token = server
+
+    async def fake_source_summary(cfg, *, on_progress=None):
+        summary = SourceSummary(
+            domain=cfg.domains[0],
+            sources=("wayback", "commoncrawl"),
+            union_urls=3,
+            evidence_records=4,
+            source_counts={"wayback": 2, "commoncrawl": 2},
+            exclusive_counts={"wayback": 1, "commoncrawl": 1},
+            shared_urls=1,
+            overlap_urls=1,
+            complete=True,
+        )
+        return SourceSummaryRunResult(
+            stats=[DomainStats(cfg.domains[0], fetched=4, kept=4)],
+            summaries={cfg.domains[0]: summary},
+        )
+
+    monkeypatch.setattr("wayparam.gui.server.run_source_summary", fake_source_summary)
+    events = _stream(
+        port,
+        token,
+        {
+            "domains": "example.com",
+            "source": "wayback,commoncrawl",
+            "source_summary": True,
+            "format": "jsonl",
+        },
+    )
+
+    assert [event["type"] for event in events] == [
+        "start",
+        "source_summary",
+        "stats",
+        "done",
+    ]
+    assert events[0]["source_summary"] is True
+    assert events[1]["record"]["type"] == "source_summary"
+    assert events[1]["record"]["union_urls"] == 3
+    assert events[1]["record"]["overlap_urls"] == 1
+
+
+def test_provenance_stream_exposes_source_and_timestamp(server, monkeypatch):
+    port, token = server
+
+    async def fake(cfg, *, on_record=None, on_progress=None):
+        if on_record:
+            on_record(
+                UrlRecord(
+                    domain=cfg.domains[0],
+                    url="https://example.com/?id=FUZZ",
+                    source="commoncrawl",
+                    fetched_at="2026-09-21T12:34:56+00:00",
+                )
+            )
+        return RunResult(stats=[DomainStats(cfg.domains[0], fetched=1, kept=1)])
+
+    monkeypatch.setattr("wayparam.gui.server.run", fake)
+    events = _stream(
+        port,
+        token,
+        {
+            "domains": "example.com",
+            "source": "wayback,commoncrawl",
+            "provenance": True,
+            "format": "jsonl",
+        },
+    )
+
+    url_event = next(event for event in events if event["type"] == "url")
+    assert url_event["source"] == "commoncrawl"
+    assert url_event["fetched_at"] == "2026-09-21T12:34:56+00:00"
+    assert events[0]["provenance"] is True

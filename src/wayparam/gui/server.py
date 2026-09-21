@@ -35,6 +35,11 @@ from ..io import parse_domains
 from ..normalize import NormalizeOptions
 from ..output import UrlRecord
 from ..providers import CommonCrawlOptions, parse_source_names
+from ..source_analysis import (
+    format_source_summary,
+    run_source_summary,
+    write_source_summary_files,
+)
 from ..wayback import CdxOptions
 
 log = logging.getLogger("wayparam.gui")
@@ -77,6 +82,19 @@ def config_from_request(data: dict) -> RunConfig:
     if analysis and sources != ("wayback",):
         raise Rejected(400, "Historical analysis currently supports Wayback only.")
 
+    provenance = bool(data.get("provenance"))
+    source_summary = bool(data.get("source_summary"))
+    if provenance and data.get("format") != "jsonl":
+        raise Rejected(400, "Provenance requires JSONL output.")
+    if provenance and source_summary:
+        raise Rejected(400, "Provenance and source summary are mutually exclusive.")
+    if provenance and analysis:
+        raise Rejected(400, "Provenance cannot be combined with historical analysis.")
+    if source_summary and analysis:
+        raise Rejected(400, "Source summary cannot be combined with historical analysis.")
+    if source_summary and len(sources) < 2:
+        raise Rejected(400, "Source summary requires at least two archive sources.")
+
     def _int(key: str, default: int, lo: int, hi: int) -> int:
         try:
             return max(lo, min(hi, int(data.get(key, default))))
@@ -99,6 +117,8 @@ def config_from_request(data: dict) -> RunConfig:
         write_files=write_files,
         out_format="jsonl" if data.get("format") == "jsonl" else "txt",
         analysis=analysis,
+        provenance=provenance,
+        source_summary=source_summary,
         concurrency=_int("concurrency", 6, 1, 64),
         rps=_float("rps", 0.0, 0.0, 1000.0),
         http=HttpConfig(
@@ -259,6 +279,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     "domain": rec.domain,
                     "url": rec.url,
                     "source": rec.source,
+                    "fetched_at": rec.fetched_at,
                 }
             )
 
@@ -269,9 +290,27 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     "domains": cfg.domains,
                     "sources": list(cfg.sources),
                     "analysis": cfg.analysis,
+                    "provenance": cfg.provenance,
+                    "source_summary": cfg.source_summary,
                 }
             )
-            if cfg.analysis:
+            if cfg.source_summary:
+                source_result = asyncio.run(run_source_summary(cfg))
+                write_source_summary_files(source_result, cfg)
+                for domain in cfg.domains:
+                    summary = source_result.summaries.get(domain)
+                    if summary is None:
+                        continue
+                    chunk(
+                        {
+                            "type": "source_summary",
+                            "record": summary.as_record(),
+                            "text": format_source_summary(summary, cfg.out_format),
+                        }
+                    )
+                stats = source_result.stats
+                errors = source_result.errors
+            elif cfg.analysis:
                 history_result = asyncio.run(run_history(cfg))
                 write_analysis_files(history_result, cfg, cfg.analysis)
                 for domain in cfg.domains:
