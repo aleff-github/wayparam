@@ -127,7 +127,6 @@ def test_analysis_mode_is_sanitized():
     assert config_from_request({"domains": "example.com", "analysis": "other"}).analysis is None
 
 
-
 def test_gui_report_can_include_optional_change_periods():
     cfg = config_from_request(
         {
