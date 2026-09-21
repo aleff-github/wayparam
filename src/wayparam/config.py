@@ -33,6 +33,8 @@ class RunConfig:
     analysis: AnalysisMode | None = None
     #: Preserve one normalized record per archive source instead of globally deduplicating.
     provenance: bool = False
+    #: Aggregate provider overlap/exclusive coverage instead of emitting URLs.
+    source_summary: bool = False
     #: Stop the whole run after this many emitted records (0 = no cap).
     max_results: int = 0
     concurrency: int = 6

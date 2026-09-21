@@ -26,6 +26,12 @@ from .io import normalize_domain, read_domains
 from .normalize import NormalizeOptions
 from .output import UrlRecord, print_hint_stderr, print_record_stdout
 from .providers import CommonCrawlOptions, SourceName, parse_source_names
+from .source_analysis import (
+    SourceSummaryRunResult,
+    format_source_summary,
+    run_source_summary,
+    write_source_summary_files,
+)
 from .wayback import PAGINATION_MODES, CdxOptions
 
 log = logging.getLogger("wayparam")
@@ -156,6 +162,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         action="store_const",
         const="summary",
         help="Emit one historical summary record per domain.",
+    )
+    analysis.add_argument(
+        "--source-summary",
+        action="store_true",
+        help="Summarize union, overlap and source-exclusive normalized URLs across archives.",
     )
 
     # Shared archive query options
@@ -377,6 +388,7 @@ def build_config(args: argparse.Namespace) -> RunConfig:
         out_format=args.format,
         analysis=args.analysis,
         provenance=args.provenance,
+        source_summary=args.source_summary,
         max_results=max(0, args.max_results),
         concurrency=args.concurrency,
         rps=args.rps,
@@ -416,7 +428,11 @@ def build_config(args: argparse.Namespace) -> RunConfig:
     )
 
 
-def _report(result: RunResult | HistoryRunResult, cfg: RunConfig, show_stats: bool) -> int:
+def _report(
+    result: RunResult | HistoryRunResult | SourceSummaryRunResult,
+    cfg: RunConfig,
+    show_stats: bool,
+) -> int:
     for domain, exc in result.errors:
         log.error("%s: %s", domain, exc)
         _maybe_print_wayback_vpn_hint(exc)
@@ -441,6 +457,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--provenance requires --format jsonl")
     if args.provenance and args.analysis:
         parser.error("--provenance cannot be combined with --history/--params/--summary")
+    if args.provenance and args.source_summary:
+        parser.error("--provenance cannot be combined with --source-summary")
 
     _setup_logging(args.verbose, args.quiet)
 
@@ -458,6 +476,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if cfg.analysis and cfg.sources != ("wayback",):
         parser.error("--history/--params/--summary currently require --source wayback")
+    if cfg.source_summary and len(cfg.sources) < 2:
+        parser.error("--source-summary requires at least two archive sources")
 
     if "commoncrawl" in cfg.sources and cfg.http.proxy:
         log.warning(
@@ -477,6 +497,18 @@ def main(argv: list[str] | None = None) -> int:
 
             def on_record(rec: UrlRecord) -> None:
                 print_record_stdout(rec, cfg.out_format)
+
+        if cfg.source_summary:
+            source_result = asyncio.run(run_source_summary(cfg, on_progress=progress))
+            if progress:
+                progress.clear()
+            write_source_summary_files(source_result, cfg)
+            if args.stdout:
+                for domain in cfg.domains:
+                    summary = source_result.summaries.get(domain)
+                    if summary is not None:
+                        print(format_source_summary(summary, cfg.out_format), flush=True)
+            return _report(source_result, cfg, args.stats)
 
         if cfg.analysis:
             history_result = asyncio.run(run_history(cfg, on_progress=progress))

@@ -2,6 +2,7 @@
 
 ## Unreleased
 - Added opt-in multi-source provenance mode with `--provenance`, preserving one normalized JSONL record per archive source while keeping default global deduplication unchanged
+- Added `--source-summary` for provider-neutral union, shared, all-source overlap and source-exclusive normalized URL counts
 
 ## 0.6.1
 - Fixed Historical Intelligence aborting on malformed archived URLs such as invalid bracketed hosts; unusable captures are now skipped instead of failing the whole domain

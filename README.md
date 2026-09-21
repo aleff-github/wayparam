@@ -195,13 +195,21 @@ wayparam -d example.com --source wayback,commoncrawl --provenance --format jsonl
 
 By default, the first configured provider wins when the same normalized URL appears in several archives. With `--provenance`, Wayparam keeps one JSONL record per source while still deduplicating repeated variants inside each source. This mode is intentionally JSONL-only because TXT output cannot carry provenance.
 
-### 10) Historical endpoint intelligence
+### 10) Compare archive coverage
+
+```bash
+wayparam -d example.com --source wayback,commoncrawl --source-summary --format jsonl --stdout --no-files
+```
+
+`--source-summary` reports the normalized-URL union, per-source counts, source-exclusive counts, URLs shared by at least two sources, and the intersection present in every selected source. It requires at least two archive sources. When `--max-results` is used, the cap applies to per-source evidence records consumed by the summary, so a capped summary is marked incomplete.
+
+### 11) Historical endpoint intelligence
 
 ```bash
 wayparam -d example.com --history --stdout --no-files --format jsonl
 ```
 
-### 11) Parameter history or a domain summary
+### 12) Parameter history or a domain summary
 
 ```bash
 wayparam -d example.com --params
@@ -274,6 +282,7 @@ wayparam -d example.com --stdout --no-files | sort -u > urls.txt
 * `--source commoncrawl`
 * `--source wayback,commoncrawl` (ordered priority)
 * `--provenance --format jsonl` to keep one normalized record per selected archive source
+* `--source-summary` to compare union, overlap and source-exclusive normalized URLs
 * `--cc-index latest` or a crawl such as `CC-MAIN-2026-39` (repeatable)
 * `--cc-page-size 5` (compressed Common Crawl index blocks per page)
 * `--cc-rps 1` (Common Crawl request rate; default intentionally conservative)
