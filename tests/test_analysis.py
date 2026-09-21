@@ -177,10 +177,7 @@ def test_changes_report_added_removed_and_persisted_entities():
         "persisted": 1,
     }
 
-    details = {
-        (record["entity"], record["status"], record["value"])
-        for record in records[1:]
-    }
+    details = {(record["entity"], record["status"], record["value"]) for record in records[1:]}
     assert ("url", "persisted", "https://example.com/persist?id=FUZZ") in details
     assert ("url", "removed", "https://example.com/legacy?legacy=FUZZ") in details
     assert ("url", "added", "https://example.com/new?q=FUZZ") in details
