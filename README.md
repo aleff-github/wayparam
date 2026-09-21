@@ -32,7 +32,7 @@ http://www.example.com/?format=FUZZ&retailerId=FUZZ
 - **Lossless CDX pagination** with automatic block-mode fallback
 - **Historical intelligence**: first/last seen, capture counts, status/MIME distributions, parameter prevalence
 - **Temporal surface intelligence**: year/month timelines of archived endpoint and parameter activity
-- **Surface topology intelligence**: host/path grouping with observed parameter-set variants
+- **Surface topology intelligence**: host/path grouping with observed parameter-set variants and parameter co-occurrence
 - Filters “boring” URLs by:
   - extension blacklist/whitelist
   - optional path regex exclusion
@@ -244,6 +244,14 @@ wayparam -d example.com --topology --format jsonl --stdout --no-files
 
 `--topology` groups normalized archive evidence by host and path, then reports observed schemes, capture counts, first/last seen, the union of parameter names and deterministic parameter-set variants. This is structural archive evidence only; it does not claim that a route or parameter combination is currently deployed.
 
+### 16) Inspect parameter co-occurrence
+
+```bash
+wayparam -d example.com --cooccurrence --format jsonl --stdout --no-files
+```
+
+`--cooccurrence` emits one record for each unordered pair of parameter names observed together on the same normalized endpoint variant, including represented URL count, distinct host/path routes, capture count and first/last seen. It is descriptive archive evidence only and does not assign risk or exploitability.
+
 Historical modes retrieve capture metadata and automatically disable CDX collapse so that first/last seen, capture counts and temporal activity are meaningful. They can therefore transfer substantially more data than a normal URL run; use `--from`, `--to`, filters or `--max-results` to bound the analysis.
 
 ---
@@ -339,6 +347,7 @@ See [Archive sources](docs/sources.md) for provider behavior and caveats.
 * `--timeline-granularity year|month` — choose timeline bucket size (default: year)
 * `--changes BASELINE COMPARISON` — compare two YYYY or YYYYMM archive buckets
 * `--topology` — group archived normalized URL evidence by host/path and parameter-set variants
+* `--cooccurrence` — aggregate unordered parameter pairs observed on the same archived endpoint variants
 
 These views are mutually exclusive. In historical modes, `--max-results` caps accepted capture rows before aggregation.
 
