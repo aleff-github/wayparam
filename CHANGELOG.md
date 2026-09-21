@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.8.0
 - Added `--timeline` historical analysis with deterministic year/month buckets for accepted captures, observed/new normalized URLs, and observed/new parameter names
 - Exposed temporal timeline analysis and year/month granularity in the local web UI
 - Added `--changes BASELINE COMPARISON` to compare archived URL shapes and parameter names between two yearly or monthly periods, with added/removed/persisted classifications
