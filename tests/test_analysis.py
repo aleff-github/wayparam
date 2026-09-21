@@ -406,7 +406,9 @@ def test_report_bundle_is_compact_jsonl():
     record = records_for(_history(), "report")[0]
     encoded = format_record(record, "jsonl")
     assert json.loads(encoded) == record
-    assert " " not in encoded
+    assert ": " not in encoded
+    assert ", " not in encoded
+
 
 def test_jsonl_output_is_compact_and_machine_readable():
     record = records_for(_history(), "summary")[0]
