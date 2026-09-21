@@ -1,4 +1,4 @@
-.TH WAYPARAM 1 "September 2026" "wayparam 0.5.0" "User Commands"
+.TH WAYPARAM 1 "September 2026" "wayparam 0.6.0" "User Commands"
 .SH NAME
 wayparam \- fetch and normalize parameterized URLs from public web archive indexes
 .SH SYNOPSIS
@@ -47,7 +47,7 @@ Read domains/hosts from a file (one per line). Use
 to read from stdin.
 .SS Archive Sources
 .TP
-.BR \-\-source " " \fINAME[,NAME...]R
+.BR \-\-source " " \fINAME[,NAME...]\fR
 Archive provider(s) in priority order. Supported values are
 .B wayback
 and
@@ -56,21 +56,21 @@ and
 .BR wayback ).
 Normalized URLs are deduplicated across providers.
 .TP
-.BR \-\-cc\-index " " \fIIDR
+.BR \-\-cc\-index " " \fIID\fR
 Common Crawl crawl index ID. Repeat or use comma-separated IDs to query several
 collections. The default is
 .BR latest ,
 resolved from Common Crawl collection metadata.
 .TP
-.BR \-\-cc\-page\-size " " \fINR
+.BR \-\-cc\-page\-size " " \fIN\fR
 Compressed Common Crawl ZipNum index blocks per page (default: 5). This is not a
 row count.
 .TP
-.BR \-\-cc\-rps " " \fIFLOATR
+.BR \-\-cc\-rps " " \fIFLOAT\fR
 Common Crawl index requests per second (default: 1). Requests to Common Crawl
 are also serialized within a run.
 .TP
-.BR \-\-cc\-filter " " \fIFILTERR
+.BR \-\-cc\-filter " " \fIFILTER\fR
 Add a Common Crawl CDXJ filter (repeatable), for example
 .IR status:200 .
 .SS Output

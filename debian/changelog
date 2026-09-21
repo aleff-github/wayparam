@@ -1,3 +1,19 @@
+wayparam (0.6.0-1) noble; urgency=medium
+
+  * New upstream release.
+  * Add archive-provider abstraction while keeping Wayback as the default.
+  * Add Common Crawl CDXJ URL discovery with latest-crawl resolution and
+    explicit multi-crawl selection.
+  * Add ordered Wayback/Common Crawl collection with cross-provider
+    deduplication and source provenance in JSONL.
+  * Serialize and rate-limit Common Crawl index requests by default, with a
+    descriptive User-Agent and provider-specific filters.
+  * Expose archive source selection in the optional local web interface.
+  * Keep historical intelligence Wayback-only to avoid ambiguous cross-archive
+    capture statistics.
+
+ -- Aleff <alessandro.greco.1@protonmail.com>  Mon, 21 Sep 2026 11:47:00 +0200
+
 wayparam (0.5.0-1) noble; urgency=medium
 
   * New upstream release.

@@ -2,18 +2,18 @@ name: wayparam
 title: wayparam
 base: core22
 adopt-info: wayparam
-summary: Fetch and normalize parameterized URLs from the Wayback CDX API
+summary: Fetch and normalize parameterized URLs from web archive indexes
 description: |
-  wayparam queries the Internet Archive Wayback Machine CDX API to retrieve
-  historical URLs for a host (or a list of hosts), filters out common
-  static/boring URLs, and outputs normalized URLs that contain query
-  parameters.
+  wayparam queries public web archive indexes, including the Internet Archive
+  Wayback CDX API and Common Crawl CDXJ indexes, to retrieve historical URLs
+  for a host (or a list of hosts), filters out common static/boring URLs, and
+  outputs normalized URLs that contain query parameters.
 
   By default, query parameter values are replaced with a placeholder (FUZZ),
   making the output suitable for sharing and fuzzing workflows. Historical
   analysis views can also report first/last seen, capture counts, status/MIME
   distributions and query-parameter prevalence. The tool does not crawl
-  targets: it only queries the public Wayback CDX API.
+  targets: it only queries public archive indexes.
 
   A local web interface is bundled as `wayparam.gui`. It listens on
   127.0.0.1 and prints a URL containing a one-time token; open that URL

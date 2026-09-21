@@ -1,4 +1,4 @@
-.TH WAYPARAM-GUI 1 "September 2026" "wayparam 0.5.0" "User Commands"
+.TH WAYPARAM-GUI 1 "September 2026" "wayparam 0.6.0" "User Commands"
 .SH NAME
 wayparam\-gui \- local web interface for wayparam
 .SH SYNOPSIS
@@ -17,7 +17,7 @@ opens it in a browser:
 wayparam UI: http://127.0.0.1:8765/?t=<token>
 .RE
 .PP
-The interface performs outbound requests to the Internet Archive on behalf of
+The interface performs outbound requests to configured public archive indexes on behalf of
 whoever can reach it, so it is deliberately not reachable from the network. It
 binds to the loopback interface only, requires the token on every request, and
 rejects requests whose

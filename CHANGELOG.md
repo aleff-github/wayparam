@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.0
 - Added archive provider abstraction with Wayback remaining the default source
 - Added Common Crawl CDXJ URL discovery via `--source commoncrawl`
 - Added ordered multi-source collection with `--source wayback,commoncrawl` and cross-provider deduplication
