@@ -115,6 +115,7 @@ async def run_source_summary(
     useful (explicitly incomplete) sample from every provider.
     """
     accumulator = _Accumulator(cfg.sources)
+    errors: list[tuple[str, Exception]] = []
 
     if cfg.max_results == 0:
         collection_cfg = replace(
@@ -130,14 +131,12 @@ async def run_source_summary(
             on_progress=on_progress,
         )
         stats = collected.stats
-        errors = collected.errors
+        errors.extend(collected.errors)
     else:
         totals: dict[str, list[int]] = {domain: [0, 0] for domain in cfg.domains}
         complete_by_domain = {domain: True for domain in cfg.domains}
-        errors: list[tuple[str, Exception]] = []
-
         for source in cfg.sources:
-            offsets = {domain: tuple(values) for domain, values in totals.items()}
+            offsets = {domain: (values[0], values[1]) for domain, values in totals.items()}
 
             def source_progress(
                 domain: str,
