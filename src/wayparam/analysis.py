@@ -144,8 +144,7 @@ class DomainHistory:
                 continue
             urls.add(endpoint.url)
             parameters.update(
-                key
-                for key, _ in parse_qsl(urlsplit(endpoint.url).query, keep_blank_values=True)
+                key for key, _ in parse_qsl(urlsplit(endpoint.url).query, keep_blank_values=True)
             )
         return urls, parameters
 
