@@ -58,8 +58,10 @@ A source summary reports:
 - `overlap_urls`: URLs observed by every selected source;
 - `complete`: false when a failure or `--max-results` stopped collection early.
 
-`--source-summary` requires at least two sources. Its `--max-results` budget
-counts per-source evidence records before aggregation, so bounded results should
+`--source-summary` requires at least two sources. When `--max-results` is set,
+the same run-wide cap is applied independently to each selected source. This
+prevents the first provider from consuming the whole budget before later
+providers are queried. Bounded summaries remain marked incomplete and should
 not be interpreted as complete archive coverage.
 
 ## Common Crawl indexes
