@@ -178,6 +178,7 @@ The following flags are mutually exclusive:
 - `--changes BASELINE COMPARISON`: compare two YYYY or YYYYMM buckets and classify normalized URLs/parameters as added, removed or persisted
 - `--topology`: group normalized archive evidence by host/path and parameter-set variants
 - `--cooccurrence`: report unordered parameter pairs observed together with URL/route/capture counts and first/last seen
+- `--report`: emit a versioned JSONL evidence bundle combining the compatible historical views from one Wayback metadata pass
 
 Historical modes currently require `--source wayback`. They request `timestamp,statuscode,mimetype,original` from Wayback CDX and automatically disable `collapse=urlkey`, because collapsed results cannot provide correct capture counts or first/last-seen dates.
 
@@ -189,7 +190,31 @@ wayparam -d example.com --timeline --timeline-granularity month --format jsonl
 wayparam -d example.com --changes 2020 2024 --format jsonl
 wayparam -d example.com --topology --format jsonl
 wayparam -d example.com --cooccurrence --format jsonl
+wayparam -d example.com --report --format jsonl
 ```
+
+### `--report`
+Emit the stable machine-readable evidence bundle. This mode requires
+`--format jsonl` and currently requires `--source wayback`.
+
+The first JSONL record is a `report_manifest` with schema
+`wayparam-evidence-report/v1`, generator version, domain, archive source,
+included sections, completeness state and bounded-run context. Following lines
+are `report_record` wrappers containing the unchanged records from summary,
+history, params, timeline, topology and co-occurrence.
+
+Use `--report-changes BASELINE COMPARISON` to include the existing period-change
+view in the same bundle without a second archive request.
+
+```bash
+wayparam -d example.com --report --format jsonl --stdout --no-files
+wayparam -d example.com --report --report-changes 2020 2024 --format jsonl
+```
+
+### `--report-changes BASELINE COMPARISON`
+Include temporal change evidence in `--report`. Both periods must be `YYYY` or
+both `YYYYMM`, and the baseline must precede the comparison period. This option
+is invalid without `--report`.
 
 ### `--topology`
 Group accepted historical evidence by host/path. The record includes observed
@@ -216,7 +241,7 @@ records for URL shapes and parameter names. `removed` means absent from the
 comparison archive bucket, not proven absent from the live target.
 
 ### `--timeline-granularity {year|month}`
-Choose the bucket size used by `--timeline`.
+Choose the bucket size used by `--timeline` and the timeline section of `--report`.
 
 **Default:** `year`
 
