@@ -336,6 +336,79 @@ def test_changes_support_month_periods_and_deterministic_text():
     ]
 
 
+
+def test_report_bundle_starts_with_versioned_manifest_and_wraps_sections():
+    records = records_for(
+        _history(),
+        "report",
+        timeline_granularity="month",
+        report_complete=True,
+        report_bounded=True,
+    )
+
+    manifest = records[0]
+    assert manifest == {
+        "type": "report_manifest",
+        "schema": "wayparam-evidence-report/v1",
+        "generator": {"name": "wayparam", "version": analysis.__version__},
+        "domain": "example.com",
+        "source": "wayback",
+        "evidence_scope": "archive-index",
+        "sections": [
+            "summary",
+            "history",
+            "params",
+            "timeline",
+            "topology",
+            "cooccurrence",
+        ],
+        "timeline_granularity": "month",
+        "compare_periods": None,
+        "complete": True,
+        "bounded_capture_budget": True,
+        "limitations": [
+            "Archive-index evidence only; no live-target state is inferred.",
+            "Bounded or incomplete runs may omit archived evidence.",
+        ],
+    }
+
+    wrapped = records[1:]
+    assert wrapped
+    assert all(record["type"] == "report_record" for record in wrapped)
+    assert {record["section"] for record in wrapped} == {
+        "summary",
+        "history",
+        "params",
+        "timeline",
+        "topology",
+        "cooccurrence",
+    }
+    summary = next(record for record in wrapped if record["section"] == "summary")
+    assert summary["record"]["type"] == "summary"
+    assert summary["record"]["unique_urls"] == 2
+
+
+def test_report_bundle_can_include_period_changes():
+    records = records_for(
+        _change_history(),
+        "report",
+        compare_periods=("2020", "2021"),
+    )
+
+    manifest = records[0]
+    assert manifest["compare_periods"] == ["2020", "2021"]
+    assert manifest["sections"][-1] == "changes"
+    changes = [record for record in records if record.get("section") == "changes"]
+    assert changes[0]["record"]["type"] == "change_summary"
+    assert any(record["record"].get("status") == "added" for record in changes[1:])
+
+
+def test_report_bundle_is_compact_jsonl():
+    record = records_for(_history(), "report")[0]
+    encoded = format_record(record, "jsonl")
+    assert json.loads(encoded) == record
+    assert " " not in encoded
+
 def test_jsonl_output_is_compact_and_machine_readable():
     record = records_for(_history(), "summary")[0]
     encoded = format_record(record, "jsonl")
@@ -406,6 +479,30 @@ def test_history_max_results_caps_accepted_captures(tmp_path):
     (stats,) = result.stats
     assert stats.kept == 1
     assert stats.complete is False
+
+
+def test_report_file_uses_report_jsonl_name(tmp_path):
+    history = _history()
+    cfg = RunConfig(
+        domains=["example.com"],
+        outdir=tmp_path,
+        write_files=True,
+        out_format="jsonl",
+        analysis="report",
+        max_results=10,
+    )
+    result = HistoryRunResult(
+        stats=[analysis.DomainStats("example.com", fetched=3, kept=3, complete=False)],
+        analyses={"example.com": history},
+    )
+
+    write_analysis_files(result, cfg, "report")
+
+    path = tmp_path / "example.com.report.jsonl"
+    lines = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    assert lines[0]["type"] == "report_manifest"
+    assert lines[0]["complete"] is False
+    assert lines[0]["bounded_capture_budget"] is True
 
 
 def test_analysis_files_use_mode_specific_names(tmp_path):
