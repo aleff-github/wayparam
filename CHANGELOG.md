@@ -2,6 +2,7 @@
 
 ## Unreleased
 - Added `--timeline` historical analysis with deterministic year/month buckets for accepted captures, observed/new normalized URLs, and observed/new parameter names
+- Exposed temporal timeline analysis and year/month granularity in the local web UI
 
 ## 0.7.0
 - Added opt-in multi-source provenance mode with `--provenance`, preserving one normalized JSONL record per archive source while keeping default global deduplication unchanged
