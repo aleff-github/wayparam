@@ -168,11 +168,7 @@ class DomainHistory:
                 new_params[period(item.first_seen[:6])] += 1
 
         periods = sorted(
-            set(captures)
-            | set(urls)
-            | set(new_urls)
-            | set(params_by_period)
-            | set(new_params)
+            set(captures) | set(urls) | set(new_urls) | set(params_by_period) | set(new_params)
         )
         return [
             {
@@ -442,7 +438,5 @@ def write_analysis_files(result: HistoryRunResult, cfg: RunConfig, mode: Analysi
         if history is None:
             continue
         with open_outfile(analysis_path(cfg.outdir, domain, mode, cfg.out_format)) as fh:
-            for record in records_for(
-                history, mode, timeline_granularity=cfg.timeline_granularity
-            ):
+            for record in records_for(history, mode, timeline_granularity=cfg.timeline_granularity):
                 fh.write(format_record(record, cfg.out_format) + "\n")
