@@ -668,6 +668,8 @@ def format_record(record: dict, fmt: OutputFormat) -> str:
         return json.dumps(record, ensure_ascii=False, separators=(",", ":"))
 
     kind = record["type"]
+    if kind in {"report_manifest", "report_record"}:
+        raise ValueError("evidence reports require jsonl output")
     if kind == "history":
         return "\t".join(
             [
