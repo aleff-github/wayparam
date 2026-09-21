@@ -336,7 +336,6 @@ def test_changes_support_month_periods_and_deterministic_text():
     ]
 
 
-
 def test_report_bundle_starts_with_versioned_manifest_and_wraps_sections():
     records = records_for(
         _history(),
