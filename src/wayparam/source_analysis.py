@@ -198,6 +198,7 @@ async def run_source_summary(
         errors=errors,
     )
 
+
 def format_source_summary(summary: SourceSummary, fmt: OutputFormat) -> str:
     record = summary.as_record()
     if fmt == "jsonl":
